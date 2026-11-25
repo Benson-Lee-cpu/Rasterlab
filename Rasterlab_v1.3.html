@@ -1,0 +1,4912 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>RasterLab v1.3 — 向量字元與半色調實驗室</title>
+  <style>
+    :root {
+      --bg-app: #e4e1d8;
+      --bg-panel: #eceae2;
+      --bg-card: #f4f2ec;
+      --bg-elevated: #dedad0;
+      --border: #c6c2b6;
+      --border-hover: #8c887d;
+      --text: #1a1a18;
+      --text-dim: #54524b;
+      --muted: #76736a;
+      --accent: #ff4d00;
+      --accent-hover: #e04300;
+      --accent-soft: rgba(255, 77, 0, 0.12);
+      --accent-glow: rgba(255, 77, 0, 0.25);
+      --cyan: #ff4d00;
+      --chassis-dark: #222220;
+      --radius: 4px;
+      --mono: "JetBrains Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: var(--bg-app);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "PingFang TC", sans-serif;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      display: grid;
+      grid-template-columns: 356px 1fr;
+      height: 100vh;
+    }
+
+    @media (max-width: 960px) {
+      body {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        height: auto;
+        overflow: auto;
+      }
+      html, body {
+        overflow: auto;
+      }
+    }
+
+    /* ===== 左側硬體儀器控制台 ===== */
+    aside {
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    @media (max-width: 960px) {
+      aside {
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+    }
+
+    .panel-header {
+      padding: 14px 16px 11px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-panel);
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .panel-header h1 {
+      font-size: 1.04rem;
+      font-weight: 800;
+      margin: 0;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+    }
+
+    .brand-badge {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 2px;
+      background: var(--chassis-dark);
+      color: #f4f2ec;
+      letter-spacing: 0.08em;
+    }
+
+    .panel-header .subtitle {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+      font-family: var(--mono);
+      letter-spacing: 0.01em;
+    }
+
+    /* 頂層通道切換器 (ASCII vs 半色調) */
+    .mode-switcher {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 9px 12px;
+      background: var(--bg-app);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mode-btn {
+      background: var(--bg-card);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 7px 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 2px 0 #b8b4a8;
+      transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+      text-align: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .mode-btn::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #b8b4a8;
+      flex-shrink: 0;
+      transition: background 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    
+
+    .mode-btn:active {
+      transform: translateY(1.5px);
+      box-shadow: 0 0 0 transparent;
+    }
+
+    .mode-btn.active {
+      background: var(--chassis-dark);
+      color: #f4f2ec;
+      border-color: #111110;
+      box-shadow: 0 2px 0 #000000;
+    }
+
+    .mode-btn.active::before {
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+    }
+
+    /* 分頁列 */
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      padding: 8px 10px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tabs[hidden] {
+      display: none !important;
+    }
+
+    .tab-btn {
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      padding: 6px 4px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.08s ease, background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+      text-align: center;
+      position: relative;
+    }
+
+    
+
+    .tab-btn:active {
+      transform: translateY(1px);
+    }
+
+    .tab-btn.active {
+      background: var(--bg-card);
+      color: var(--accent);
+      border-color: var(--border);
+      box-shadow: 0 1px 0 #b8b4a8;
+    }
+
+    .tab-btn .dot-new {
+      display: inline-block;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-left: 3px;
+      vertical-align: super;
+    }
+
+    /* 捲動區 */
+    .panel-scroll {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .panel-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+    .panel-scroll::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    .tab-pane {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .tab-pane.active {
+      display: flex;
+    }
+
+    /* 模組區塊卡片 */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 11px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .card-highlight {
+      border-color: var(--border-hover);
+      border-left: 3px solid var(--accent);
+    }
+
+    .card-title {
+      font-family: var(--mono);
+      font-size: 0.69rem;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--bg-elevated);
+      padding-bottom: 6px;
+    }
+
+    /* 圖片上傳區 */
+    .dropzone {
+      border: 1.5px dashed var(--border-hover);
+      border-radius: var(--radius);
+      padding: 13px 10px;
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      background: var(--bg-panel);
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--text);
+    }
+
+    /* 控制項列 */
+    .ctl {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 3px 4px;
+      border-radius: var(--radius);
+      transition: background 0.12s ease;
+    }
+
+    .ctl.is-sliding {
+      background: rgba(255, 77, 0, 0.07);
+    }
+
+    .ctl-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.78rem;
+      font-weight: 500;
+    }
+
+    .val-pill {
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--text);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      padding: 1px 6px;
+      border-radius: 2px;
+      min-width: 44px;
+      text-align: right;
+      transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease, transform 0.1s ease;
+    }
+
+    .ctl.is-sliding .val-pill {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent-hover);
+      transform: scale(1.06);
+    }
+
+    .hint {
+      font-size: 0.69rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    /* 硬體推桿滑桿 */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      border-radius: 2px;
+      background: var(--border);
+      outline: none;
+      cursor: ew-resize;
+      margin: 4px 0;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 13px;
+      height: 18px;
+      border-radius: 2px;
+      background: var(--chassis-dark);
+      border: 1px solid #111110;
+      box-shadow: inset 0 0 0 2px var(--bg-card), 0 1px 2px rgba(0, 0, 0, 0.28);
+      cursor: ew-resize;
+      transition: background 0.1s ease, transform 0.1s ease, box-shadow 0.1s ease;
+    }
+
+    
+
+    input[type="range"]:active::-webkit-slider-thumb,
+    .ctl.is-sliding input[type="range"]::-webkit-slider-thumb {
+      background: var(--accent);
+      border-color: var(--accent-hover);
+      box-shadow: inset 0 0 0 2px #ffffff, 0 0 0 3px var(--accent-glow);
+      transform: scale(1.1);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 13px;
+      height: 18px;
+      border-radius: 2px;
+      background: var(--chassis-dark);
+      border: 1px solid #111110;
+      box-shadow: inset 0 0 0 2px var(--bg-card), 0 1px 2px rgba(0, 0, 0, 0.28);
+      cursor: ew-resize;
+    }
+
+    input[type="range"]:active::-moz-range-thumb,
+    .ctl.is-sliding input[type="range"]::-moz-range-thumb {
+      background: var(--accent);
+      border-color: var(--accent-hover);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    input[type="color"] {
+      width: 34px;
+      height: 22px;
+      border: 1px solid var(--border-hover);
+      border-radius: 2px;
+      background: var(--bg-elevated);
+      cursor: pointer;
+      padding: 1px;
+    }
+
+    select,
+    input[type="text"] {
+      width: 100%;
+      background: var(--bg-panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px 8px;
+      font-size: 0.77rem;
+      outline: none;
+      transition: border-color 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    select:focus,
+    input[type="text"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-soft);
+    }
+
+    .mono-input {
+      font-family: var(--mono);
+      font-size: 0.74rem;
+    }
+
+    /* 矩形硬體撥動開關 */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .switch {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider-sw {
+      position: absolute;
+      inset: 0;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-hover);
+      border-radius: 2px;
+      transition: background 0.14s ease, border-color 0.14s ease;
+      cursor: pointer;
+    }
+
+    .slider-sw::before {
+      content: "";
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      left: 2px;
+      top: 2px;
+      background: var(--chassis-dark);
+      border-radius: 1px;
+      transition: transform 0.14s ease, background 0.14s ease;
+    }
+
+    .switch input:checked + .slider-sw {
+      background: var(--accent);
+      border-color: var(--accent-hover);
+    }
+
+    .switch input:checked + .slider-sw::before {
+      transform: translateX(16px);
+      background: #ffffff;
+    }
+
+    /* 實體按鍵樣式 */
+    .btn {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: var(--radius);
+      border: 1px solid var(--accent-hover);
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 0.77rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 2px 0 #a83200;
+      transition: transform 0.07s ease, box-shadow 0.07s ease, background 0.12s ease;
+      text-align: center;
+    }
+
+    
+
+    .btn:active,
+    .btn.is-pressed {
+      transform: translateY(1.5px);
+      box-shadow: 0 0 0 transparent;
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text);
+      border: 1px solid var(--border-hover);
+      box-shadow: 0 2px 0 #b5b1a5;
+    }
+
+    
+
+    .btn-secondary:active,
+    .btn-secondary.is-pressed {
+      transform: translateY(1.5px);
+      box-shadow: 0 0 0 transparent;
+    }
+
+    .btn-sm {
+      padding: 6px 8px;
+      font-size: 0.72rem;
+    }
+
+    .btn.is-selected-preset {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent-hover);
+    }
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .color-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .color-box {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      font-size: 0.75rem;
+      padding: 4px 6px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-panel);
+    }
+
+    .cmyk-angle-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .panel-footer {
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-panel);
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    /* ===== 右側主畫布顯示艙 ===== */
+    main {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #d7d4ca;
+      background-image: radial-gradient(#b5b1a6 1px, transparent 1px);
+      background-size: 16px 16px;
+    }
+
+    @media (max-width: 960px) {
+      main {
+        height: auto;
+        min-height: 70vh;
+      }
+    }
+
+    .topbar {
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-panel);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .status-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.74rem;
+      color: var(--text-dim);
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 3px 9px;
+      border-radius: 2px;
+      font-size: 0.72rem;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .chip-mono {
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .bg-swatch {
+      width: 11px;
+      height: 11px;
+      border-radius: 2px;
+      border: 1px solid rgba(0, 0, 0, 0.35);
+      display: inline-block;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .topbar-actions .btn {
+      width: auto;
+      padding: 6px 11px;
+      font-size: 0.73rem;
+    }
+
+    .stage {
+      flex: 1 1 auto;
+      overflow: auto;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .canvas-frame {
+      background: #232321;
+      border: 2px solid #1a1a18;
+      border-radius: 6px;
+      padding: 10px;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      max-width: 100%;
+      max-height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .canvas-stage-wrap {
+      position: relative;
+      display: inline-flex;
+      max-width: 100%;
+      max-height: 100%;
+      user-select: none;
+    }
+
+    .orig-compare-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 2px;
+      pointer-events: none;
+      clip-path: inset(0 calc(100% - var(--split, 50%)) 0 0);
+    }
+
+    .compare-divider {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: var(--split, 50%);
+      width: 2px;
+      background: var(--accent);
+      box-shadow: 0 0 8px rgba(255, 77, 0, 0.7);
+      cursor: ew-resize;
+      z-index: 15;
+      transform: translateX(-1px);
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    .compare-handle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--chassis-dark);
+      color: #ffffff;
+      border: 1.5px solid var(--accent);
+      border-radius: 3px;
+      padding: 4px 7px;
+      font-family: var(--mono);
+      font-size: 0.66rem;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+      pointer-events: auto;
+      cursor: ew-resize;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    body.is-dragging-split,
+    body.is-dragging-split * {
+      user-select: none !important;
+      -webkit-user-select: none !important;
+      cursor: ew-resize !important;
+    }
+
+    .compare-tag {
+      position: absolute;
+      top: 8px;
+      padding: 2px 7px;
+      border-radius: 2px;
+      background: rgba(26, 26, 24, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      font-family: var(--mono);
+      font-size: 0.66rem;
+      color: #f4f2ec;
+      pointer-events: none;
+      z-index: 14;
+    }
+
+    .compare-tag-left { left: 8px; }
+    .compare-tag-right { right: 8px; }
+
+    .floating-left-bar {
+      position: absolute;
+      bottom: 16px;
+      left: 18px;
+      z-index: 50;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .floating-opt-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 11px;
+      border-radius: var(--radius);
+      background: var(--bg-panel);
+      border: 1px solid var(--border-hover);
+      box-shadow: 0 2px 0 #b5b1a5;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.08s ease, box-shadow 0.08s ease, border-color 0.12s ease;
+    }
+
+    
+
+    .floating-opt-pill:active {
+      transform: translateY(1.5px);
+      box-shadow: 0 0 0 transparent;
+    }
+
+    .floating-opt-pill input[type="checkbox"] {
+      accent-color: var(--accent);
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .mini-zoom-select {
+      width: auto;
+      padding: 2px 6px;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      border-radius: 2px;
+      background: var(--chassis-dark);
+      color: #ffffff;
+      border: 1px solid var(--chassis-dark);
+    }
+
+    .magnifier-lens {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 176px;
+      height: 176px;
+      border-radius: 50%;
+      border: 2.5px solid var(--accent);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+      pointer-events: none;
+      will-change: transform;
+      z-index: 90;
+      overflow: hidden;
+      background: #1a1a18;
+    }
+
+    .magnifier-lens svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      isolation: isolate;
+      pointer-events: none;
+    }
+
+    .magnifier-lens svg * {
+      filter: none !important;
+    }
+
+    .magnifier-lens.transparent-preview {
+      background-color: #8f8f8f;
+      background-image:
+        linear-gradient(45deg, #a8a8a8 25%, transparent 25%),
+        linear-gradient(-45deg, #a8a8a8 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #a8a8a8 75%),
+        linear-gradient(-45deg, transparent 75%, #a8a8a8 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+    }
+
+    .magnifier-crosshair {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .magnifier-crosshair::before,
+    .magnifier-crosshair::after {
+      content: "";
+      position: absolute;
+      background: rgba(255, 77, 0, 0.55);
+    }
+
+    .magnifier-crosshair::before {
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+    }
+
+    .magnifier-crosshair::after {
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 1px;
+    }
+
+    .magnifier-badge {
+      position: absolute;
+      bottom: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--chassis-dark);
+      color: #ffffff;
+      border: 1px solid var(--accent);
+      border-radius: 2px;
+      padding: 1px 6px;
+      font-size: 0.64rem;
+      font-family: var(--mono);
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .canvas-frame.transparent-preview {
+      background-color: #8f8f8f;
+      background-image:
+        linear-gradient(45deg, #a8a8a8 25%, transparent 25%),
+        linear-gradient(-45deg, #a8a8a8 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #a8a8a8 75%),
+        linear-gradient(-45deg, transparent 75%, #a8a8a8 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+    }
+
+    svg#outputSvg {
+      display: block;
+      border-radius: 2px;
+      isolation: isolate;
+      pointer-events: none;
+      text-rendering: optimizeSpeed;
+    }
+
+    canvas#asciiCanvas {
+      display: block;
+      border-radius: 2px;
+      pointer-events: none;
+    }
+
+    .magnifier-lens canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    svg#outputSvg.fit-mode {
+      max-width: 100%;
+      max-height: calc(100vh - 130px);
+      width: auto;
+      height: auto;
+    }
+
+    .floating-output-opt {
+      position: fixed;
+      bottom: 16px;
+      right: 18px;
+      z-index: 50;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 11px;
+      border-radius: var(--radius);
+      background: var(--bg-panel);
+      border: 1px solid var(--border-hover);
+      box-shadow: 0 2px 0 #b5b1a5;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.08s ease, box-shadow 0.08s ease, border-color 0.12s ease;
+    }
+
+    
+
+    .floating-output-opt:active {
+      transform: translateY(1.5px);
+      box-shadow: 0 0 0 transparent;
+    }
+
+    .floating-output-opt input[type="checkbox"] {
+      accent-color: var(--accent);
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 62px;
+      right: 18px;
+      background: var(--chassis-dark);
+      color: #f4f2ec;
+      border: 1px solid #111110;
+      border-left: 3px solid var(--accent);
+      padding: 7px 12px;
+      border-radius: 2px;
+      font-family: var(--mono);
+      font-size: 0.74rem;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: all 0.16s ease;
+      z-index: 100;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  
+    /* ================= v1.3 觸控優化 ================= */
+    @media (hover: hover) {
+      .mode-btn:hover {
+      color: var(--text);
+      border-color: var(--border-hover);
+    }
+      .tab-btn:hover {
+      color: var(--text);
+      background: var(--bg-elevated);
+    }
+      .dropzone:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--text);
+    }
+      input[type="range"]:hover::-webkit-slider-thumb {
+      border-color: var(--accent);
+      transform: scaleY(1.06);
+    }
+      .btn:hover {
+      background: var(--accent-hover);
+    }
+      .btn-secondary:hover {
+      border-color: var(--text);
+      background: #ffffff;
+    }
+      .floating-opt-pill:hover {
+      border-color: var(--text);
+    }
+      .floating-output-opt:hover {
+      border-color: var(--text);
+    }
+    }
+    html, body { overscroll-behavior: none; }
+    button, select, label, .dropzone, .mode-btn, .tab-btn, .floating-opt-pill, .floating-output-opt {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* 滑桿：垂直滑動交給面板捲動，水平拖曳才調整數值 */
+    input[type="range"] { touch-action: pan-y; }
+    .canvas-stage-wrap { transform-origin: 50% 50%; -webkit-touch-callout: none; }
+    .canvas-frame { touch-action: none; }
+    .sheet-handle { display: none; }
+
+    @media (pointer: coarse) {
+      /* 觸控目標 ≥ 44px；滑桿視覺軌道維持細線，觸控高度加大 */
+      input[type="range"] {
+        height: 34px;
+        margin: 0;
+        background-color: transparent;
+        background-repeat: no-repeat;
+        background-size: 100% 6px;
+        background-position: center;
+        border-radius: 3px;
+      }
+      input[type="range"]::-webkit-slider-thumb { width: 24px; height: 30px; border-radius: 4px; }
+      input[type="range"]::-moz-range-thumb { width: 22px; height: 28px; border-radius: 4px; }
+      input[type="range"]::-moz-range-track { height: 6px; background: transparent; }
+      .ctl { gap: 3px; padding: 4px; }
+      .card { gap: 12px; }
+      .mode-btn { min-height: 44px; font-size: 0.82rem; }
+      .tab-btn { min-height: 42px; font-size: 0.8rem; }
+      .btn, .btn-sm { min-height: 44px; font-size: 0.82rem; }
+      .topbar-actions .btn { min-height: 40px; }
+      .switch { width: 50px; height: 30px; }
+      .slider-sw::before { width: 24px; height: 24px; left: 2px; top: 2px; }
+      .switch input:checked + .slider-sw::before { transform: translateX(20px); }
+      .toggle-row { min-height: 40px; }
+      select, input[type="text"] { min-height: 42px; font-size: 16px; } /* 16px：避免 iOS 聚焦時自動放大頁面 */
+      #aspectCrop { min-height: 40px; font-size: 14px !important; }
+      input[type="color"] { width: 48px; height: 34px; }
+      .floating-opt-pill, .floating-output-opt { min-height: 42px; padding: 8px 12px; font-size: 0.8rem; }
+      .floating-opt-pill input[type="checkbox"], .floating-output-opt input[type="checkbox"] { width: 22px; height: 22px; }
+      .mini-zoom-select { min-height: 32px; font-size: 14px; }
+      .compare-handle { padding: 12px 14px; font-size: 0.85rem; }
+      .compare-divider::before { content: ""; position: absolute; top: 0; bottom: 0; left: -16px; right: -16px; }
+      .dropzone { padding: 18px 10px; }
+    }
+
+    /* ===== 手機／直立平板：畫布在上、控制項在下，各自捲動（原本整頁很長，畫布被擠到最底下） ===== */
+    @media (max-width: 960px) {
+      html, body { overflow: hidden; height: 100%; }
+      body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, var(--stage-h, 50dvh)) minmax(0, 1fr);
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
+      }
+      main { order: -1; height: auto; min-height: 0; }
+      aside { order: 0; height: auto; min-height: 0; border-bottom: none; border-top: 1px solid var(--border); position: relative; }
+      /* 控制區高度寶貴：隱藏品牌標題列，匯出列壓成單行 */
+      .panel-header { display: none; }
+      .mode-switcher, .tabs { flex: none; }
+      .panel-footer {
+        flex: none;
+        grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr));
+        gap: 6px;
+        padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+      }
+      .panel-footer #exportRes { grid-column: auto !important; font-size: 13px !important; padding: 4px 6px; }
+      .panel-footer .btn { padding: 6px 4px; font-size: 0.76rem; }
+      .floating-opt-pill, .floating-output-opt { min-height: 38px; padding: 6px 10px; font-size: 0.74rem; }
+      .topbar { flex-wrap: nowrap; overflow-x: auto; padding: 6px 10px; gap: 8px; scrollbar-width: none; padding-top: calc(6px + env(safe-area-inset-top, 0px)); }
+      .topbar::-webkit-scrollbar { display: none; }
+      .status-group, .topbar-actions { flex-wrap: nowrap; flex: none; }
+      .chip { white-space: nowrap; }
+      .stage { padding: 8px; overflow: hidden; }
+      .canvas-frame { padding: 6px; }
+      .floating-left-bar { left: 8px; bottom: 8px; gap: 6px; }
+      .floating-left-bar .floating-output-opt { position: static; }
+      .sheet-handle {
+        display: block; position: relative; flex: none; height: 22px; margin: 0; cursor: ns-resize; touch-action: none;
+        background: var(--bg-panel); border-bottom: 1px solid var(--border);
+      }
+      .sheet-handle::before {
+        content: ""; position: absolute; left: 50%; top: 8px; width: 40px; height: 5px; margin-left: -20px;
+        border-radius: 3px; background: var(--border-hover);
+      }
+    }
+    /* 橫向手機：左右並排 */
+    @media (max-width: 960px) and (orientation: landscape) and (max-height: 600px) {
+      body { grid-template-columns: minmax(0, 1fr) minmax(300px, 40vw); grid-template-rows: minmax(0, 1fr); }
+      main { order: 0; }
+      aside { border-top: none; border-left: 1px solid var(--border); }
+      .sheet-handle { display: none; }
+    }
+</style>
+</head>
+<body>
+  <aside>
+    <div class="panel-header">
+      <div class="brand-row">
+        <h1>RasterLab <span class="brand-badge">LAB // V2</span></h1>
+      </div>
+      <div class="subtitle">向量字元堆疊 × CMYK 半色調網屏工作站</div>
+    </div>
+
+    <!-- 頂層通道切換：ASCII 立體字元 vs 半色調網點 -->
+    <div class="mode-switcher" role="group" aria-label="渲染模式">
+      <button type="button" class="mode-btn active" data-app-mode="ascii">ASCII 立體字元</button>
+      <button type="button" class="mode-btn" data-app-mode="halftone">半色調網點 Halftone</button>
+    </div>
+
+    <!-- ASCII 四大分頁 -->
+    <div class="tabs" id="asciiTabs" role="tablist">
+      <button type="button" class="tab-btn active" data-tab="base">基礎網格</button>
+      <button type="button" class="tab-btn" data-tab="color">色彩光影</button>
+      <button type="button" class="tab-btn" data-tab="stack">字元堆疊<span class="dot-new"></span></button>
+      <button type="button" class="tab-btn" data-tab="fx">質感濾鏡</button>
+    </div>
+
+    <!-- 半色調三大分頁 -->
+    <div class="tabs" id="halftoneTabs" role="tablist" style="grid-template-columns: repeat(3, 1fr);" hidden>
+      <button type="button" class="tab-btn active" data-tab="ht-dots">網點幾何</button>
+      <button type="button" class="tab-btn" data-tab="ht-color">CMYK 與色彩</button>
+      <button type="button" class="tab-btn" data-tab="ht-fx">印刷質感</button>
+    </div>
+
+    <div class="panel-scroll">
+      <!-- 分頁 1：基礎網格與字元 -->
+      <div class="tab-pane active" id="pane-base">
+        <div class="card">
+          <div class="card-title">一鍵風格實驗</div>
+          <div class="preset-grid">
+            <button type="button" class="btn btn-secondary btn-sm" data-scene="stack3d">3D 堆疊浮雕</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-scene="classic3d">冷暖雙色立體</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-scene="cyber">賽博霓虹發光</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-scene="retroCrt">復古 CRT 終端</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">輸入影像</div>
+          <div id="dropzone" class="dropzone">
+            拖曳圖片到此，或點擊選擇檔案<br />
+            <span style="font-size: 0.7rem; color: var(--muted);">支援 PNG / JPG / WebP</span>
+          </div>
+          <input type="file" id="fileInput" accept="image/*" hidden />
+          <div class="preset-grid">
+            <button type="button" id="demoBtn" class="btn btn-secondary btn-sm">光影雙球示範</button>
+            <button type="button" id="demoTorusBtn" class="btn btn-secondary btn-sm">立體環面示範</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">字元集與背景映射</div>
+          <div class="ctl">
+            <div class="ctl-row"><span>字元梯度集</span></div>
+            <select id="rampPreset">
+              <option value="@%#*+=-:. " selected>經典符號梯度 (@%#*+=-:. )</option>
+              <option value="█▓▒░ ">ANSI 網點色塊 (█▓▒░ )</option>
+              <option value="●◉◎○•· ">圓點景深 (●◉◎○•· )</option>
+              <option value="/\|()1{}[]?-_+~<>i!lI;:,. ">幾何線條結構 (/\|()1...)</option>
+              <option value="$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\|()1{}[]?-_+~<>i!lI;:,\^`'. ">70階精細明暗</option>
+              <option value="custom">自訂字元集（下方輸入）</option>
+            </select>
+            <div class="hint">決定用來表現明暗層次的字元組合，筆畫越密的字元代表越亮或越暗的區域。</div>
+          </div>
+          <div class="ctl" id="customRampWrap" style="display:none;">
+            <input type="text" id="customRamp" class="mono-input" placeholder="由密到疏，例如：#@+=-:. " value="#@+=-:. " />
+            <div class="hint">依視覺密度由高到低輸入自訂字元（建議末尾保留空白字元）。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>背景模式</span></div>
+            <select id="bgMode">
+              <option value="dark" selected>復古黑底 (#0a0d12)</option>
+              <option value="light">亮白紙底 (#f7f8fa)</option>
+              <option value="navy">終端深藍 (#091933)</option>
+              <option value="complementary">原圖互補色背景（自動）</option>
+              <option value="custom">自訂色號（RGB / CMYK）</option>
+            </select>
+            <div class="hint">切換畫布底色；深色底適合發光對比，亮白底適合印刷與素描質感。</div>
+            <div id="customBgWrap" style="display: none; flex-direction: column; gap: 6px; margin-top: 8px; padding: 8px; border-radius: 4px; background: var(--bg-panel); border: 1px solid var(--border);">
+              <select id="customBgFormat">
+                <option value="rgb" selected>RGB 色號（R, G, B 或 #Hex）</option>
+                <option value="cmyk">CMYK 印刷色號（C, M, Y, K %）</option>
+              </select>
+              <input type="text" id="customBgInput" value="10, 13, 18" placeholder="例如：20, 30, 45 或 #141e2d" />
+              <div class="ctl-row" style="font-size: 0.72rem; color: var(--muted);">
+                <span style="display: inline-flex; align-items: center; gap: 6px;">
+                  <span class="bg-swatch" id="customBgPreview" style="background: #0a0d12;"></span>
+                  <span id="customBgParsed">預覽：#0a0d12 · rgb(10, 13, 18)</span>
+                </span>
+              </div>
+              <div class="hint" id="customBgHint">RGB 請輸入「R, G, B」（0–255）或「#RRGGBB」；CMYK 請輸入「C, M, Y, K」（0–100%）。</div>
+            </div>
+          </div>
+          <div class="ctl">
+            <label class="toggle-row">
+              <span>亮色背景自動反轉字元密度</span>
+              <span class="switch"><input type="checkbox" id="autoInvertRamp" checked /><span class="slider-sw"></span></span>
+            </label>
+            <div class="hint">切換為亮白紙底時自動將筆畫密度的對應方向反轉，維持正確陰影感。</div>
+          </div>
+          <div class="ctl">
+            <label class="toggle-row">
+              <span>手動強制反轉亮度映射</span>
+              <span class="switch"><input type="checkbox" id="manualInvert" /><span class="slider-sw"></span></span>
+            </label>
+            <div class="hint">強制對調亮部與暗部所使用的字元疏密順序。</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">網格解析度與排列</div>
+          <div class="ctl">
+            <div class="ctl-row"><span>排列方式</span></div>
+            <select id="layoutMode">
+              <option value="grid" selected>標準等寬網格</option>
+              <option value="brick">交錯磚牆排列（奇數行錯位）</option>
+            </select>
+            <div class="hint">交錯磚牆會將奇數行右移半格，減少垂直網格線條感、讓曲面更平滑。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>取樣寬度（字元欄數）</span><span class="val-pill" id="colsVal">220</span></div>
+            <input type="range" id="cols" min="80" max="440" step="5" value="220" />
+            <div class="hint">橫向每行使用的字元數量，數值越大細節越精細（已加倍為 80～440 欄）。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>字元長寬比校正</span><span class="val-pill" id="aspectVal">0.55</span></div>
+            <input type="range" id="aspect" min="0.35" max="0.90" step="0.01" value="0.55" />
+            <div class="hint">補償等寬字體「高大於寬」的比例，若影像被拉長或壓扁可微調此值。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分頁 2：色彩與光影 -->
+      <div class="tab-pane" id="pane-color">
+        <div class="card">
+          <div class="card-title">取樣訊號通道 (Signal)</div>
+          <div class="ctl">
+            <div class="ctl-row"><span>字元密度驅動訊號</span></div>
+            <select id="asciiSignal">
+              <option value="luma" selected>亮度 (Luma · 預設)</option>
+              <option value="sat">飽和度 (Saturation)</option>
+              <option value="hue">色相角度 (Hue)</option>
+              <option value="red">紅色通道 (Red)</option>
+              <option value="green">綠色通道 (Green)</option>
+              <option value="blue">藍色通道 (Blue)</option>
+            </select>
+            <div class="hint">決定用原圖的哪種色彩屬性來對應字元筆畫疏密（例如改用飽和度突出鮮豔區域）。</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">冷暖雙色與色彩模式</div>
+          <div class="ctl">
+            <div class="ctl-row"><span>色彩模式</span></div>
+            <select id="colorMode">
+              <option value="duotone" selected>冷暖雙色對比（3D 立體推薦）</option>
+              <option value="original">保留原圖色相＋立體明暗</option>
+            </select>
+            <div class="hint">雙色對比會以冷暖色溫強化前後景深；原圖色相則保留圖片原本顏色。</div>
+          </div>
+          <div class="ctl" id="duotoneSection">
+            <div class="ctl-row"><span>預設色組合</span></div>
+            <select id="duotonePreset">
+              <option value="">自訂顏色</option>
+              <option value="amber" selected>暗夜琥珀（影 #1E1B4B / 高 #F59E0B）</option>
+              <option value="pinkOcean">錯覺海洋（影 #1E3A5F / 高 #EC4899）</option>
+              <option value="cyanPurple">霓虹紫（影 #7C3AED / 高 #22D3EE）</option>
+              <option value="forestCream">森林奶油（影 #14532D / 高 #FEF3C7）</option>
+              <option value="noirRose">黑玫瑰（影 #111827 / 高 #FDA4AF）</option>
+              <option value="synthwave">合成波（影 #561C90 / 高 #FF0055）</option>
+              <option value="cyberpunk">賽博龐克（影 #7000FF / 高 #00F2FF）</option>
+              <option value="ocean">深海青（影 #002B5C / 高 #4CC9F0）</option>
+              <option value="fire">烈焰橘（影 #3A1C00 / 高 #FF6B00）</option>
+              <option value="sepia">古典褐（影 #3E2723 / 高 #D4AF37）</option>
+            </select>
+            <div class="hint">快速套用精選冷暖雙色配色，高光色與陰影色會同步更新。</div>
+          </div>
+          <div class="ctl">
+            <div class="color-pair" id="duotoneColors">
+              <div class="color-box">
+                <span>高光（凸）</span>
+                <input type="color" id="highlightColor" value="#ffd166" />
+              </div>
+              <div class="color-box">
+                <span>陰影（凹）</span>
+                <input type="color" id="shadowColor" value="#2b2d7c" />
+              </div>
+            </div>
+            <div class="hint" id="duotoneHint">自訂亮部（前進凸出）與暗部（後退下沉）的色彩插值端點。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>色彩立體權重</span><span class="val-pill" id="colorMixVal">0.85</span></div>
+            <input type="range" id="colorMix" min="0" max="1" step="0.05" value="0.85" />
+            <div class="hint">控制雙色調與原圖色彩的混合比例，0 為純原色、1 為純雙色調。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>雙色混色模式</span></div>
+            <select id="blendMode">
+              <option value="normal">Normal 標準插值</option>
+              <option value="screen">Screen 濾色提亮</option>
+              <option value="multiply">Multiply 正片疊底</option>
+              <option value="overlay">Overlay 疊加增強</option>
+            </select>
+            <div class="hint">決定雙色調與原圖的混合算法，Overlay 與 Multiply 可加強立體反差。</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">基礎明暗與色調</div>
+          <div class="ctl">
+            <div class="ctl-row"><span>對比度增強</span><span class="val-pill" id="contrastVal">1.25</span></div>
+            <input type="range" id="contrast" min="0.5" max="2.5" step="0.05" value="1.25" />
+            <div class="hint">拉開亮部與暗部差距，讓光影輪廓與字元層次更分明（影響字元選取）。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>亮度調整</span><span class="val-pill" id="brightVal">1.00</span></div>
+            <input type="range" id="brightness" min="0.2" max="2.0" step="0.05" value="1.00" />
+            <div class="hint">整體提亮或壓暗畫面，適合修正過暗或過曝的輸入影像。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>色彩飽和度</span><span class="val-pill" id="saturationVal">1.00</span></div>
+            <input type="range" id="saturation" min="0" max="2" step="0.05" value="1.00" />
+            <div class="hint">調整輸出色彩鮮豔度，0 為純灰階單色、大於 1 更鮮豔。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>色相偏移</span><span class="val-pill" id="hueShiftVal">0°</span></div>
+            <input type="range" id="hueShift" min="-180" max="180" step="2" value="0" />
+            <div class="hint">旋轉整體色環角度（-180° 至 +180°），快速變換整體氛圍色系。</div>
+          </div>
+          <div class="ctl">
+            <label class="toggle-row">
+              <span>自動對比（拉伸亮度至全範圍）</span>
+              <span class="switch"><input type="checkbox" id="autoContrast" /><span class="slider-sw"></span></span>
+            </label>
+            <div class="hint">自動偵測最暗與最亮像素並拉伸動態範圍，改善灰矇低反差圖片。</div>
+          </div>
+          <div class="ctl">
+            <label class="toggle-row">
+              <span>色彩反轉（負片效果）</span>
+              <span class="switch"><input type="checkbox" id="colorInvert" /><span class="slider-sw"></span></span>
+            </label>
+            <div class="hint">將 RGB 色彩與明暗完全反轉，呈現暗房負片視覺效果。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分頁 3：字元堆疊 3D 效果 -->
+      <div class="tab-pane" id="pane-stack">
+        <div class="card card-highlight">
+          <div class="card-title">字元堆疊立體引擎 <span>NEW</span></div>
+          <div class="ctl">
+            <div class="ctl-row"><span>堆疊模式</span></div>
+            <select id="stackMode">
+              <option value="extrude" selected>3D 擠出堆疊 (Extrude)</option>
+              <option value="parallax">視差浮雕堆疊 (Parallax Relief)</option>
+              <option value="overprint">雙層字元疊印 (Overprint)</option>
+              <option value="off">關閉（純平面 ASCII）</option>
+            </select>
+          </div>
+          <div class="hint" id="stackModeHint">
+            依像素亮度計算 Z 軸高度，將字元從陰影底層到高光頂層逐層位移疊繪，創造真實的空間厚度與浮雕立體感。
+          </div>
+
+          <div class="ctl">
+            <div class="ctl-row"><span>堆疊層數 (Layers)</span><span class="val-pill" id="stackLayersVal">4</span></div>
+            <input type="range" id="stackLayers" min="2" max="8" step="1" value="4" />
+            <div class="hint">控制每個字元重複疊繪的層數，層數越多立體側面越滑順厚實。</div>
+          </div>
+
+          <div class="ctl">
+            <div class="ctl-row"><span>Z 軸深度 / 位移距離</span><span class="val-pill" id="stackDepthVal">3.0 px</span></div>
+            <input type="range" id="stackDepth" min="0.5" max="10" step="0.5" value="3.0" />
+            <div class="hint">決定底層與頂層之間的最大位移像素，數值越大立體浮出感越強烈。</div>
+          </div>
+
+          <div class="ctl">
+            <div class="ctl-row"><span>光源 / 擠出角度</span><span class="val-pill" id="stackAngleVal">135°</span></div>
+            <input type="range" id="stackAngle" min="0" max="360" step="5" value="135" />
+            <div class="hint">設定立體擠出與投影的方向角度，預設 135° 模擬左上受光、右下投影。</div>
+          </div>
+
+          <div class="ctl">
+            <div class="ctl-row"><span>底層陰影衰減</span><span class="val-pill" id="stackFadeVal">0.55</span></div>
+            <input type="range" id="stackFade" min="0.1" max="0.95" step="0.05" value="0.55" />
+            <div class="hint">調整下層字元的暗化與淡出程度，數值越高越能襯托頂層高光字元。</div>
+          </div>
+
+          <div class="ctl">
+            <label class="toggle-row">
+              <span>高光頂層微放大（強化凸出透視）</span>
+              <span class="switch"><input type="checkbox" id="stackScale" checked /><span class="slider-sw"></span></span>
+            </label>
+            <div class="hint">讓越亮的頂層字元稍微放大，產生近大遠小的 3D 透視浮凸效果。</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">結構輪廓輔助</div>
+          <div class="ctl">
+            <div class="ctl-row"><span>字元外框描邊</span><span class="val-pill" id="strokeVal">0.00</span></div>
+            <input type="range" id="stroke" min="0" max="1" step="0.05" value="0" />
+            <div class="hint">為每個字元加上深色外框描邊，避免多層堆疊時筆畫糊在一起。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>3D 壓紋浮雕 (Emboss)</span><span class="val-pill" id="embossVal">0.00</span></div>
+            <input type="range" id="emboss" min="0" max="1" step="0.05" value="0" />
+            <div class="hint">計算左上相鄰像素的亮度差，在物體邊緣形成浮雕明暗高光與陰影。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>邊緣輪廓強調</span><span class="val-pill" id="edgeVal">0.00</span></div>
+            <input type="range" id="edge" min="0" max="1" step="0.05" value="0" />
+            <div class="hint">偵測畫面輪廓並提高邊緣亮度，讓物體外型與結構線條更清晰。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分頁 4：質感濾鏡 -->
+      <div class="tab-pane" id="pane-fx">
+        <div class="card">
+          <div class="card-title">發光與螢幕質感</div>
+          <div class="ctl">
+            <div class="ctl-row"><span>霓虹發光 (Bloom)</span><span class="val-pill" id="bloomVal">0.00</span></div>
+            <input type="range" id="bloom" min="0" max="2" step="0.05" value="0" />
+            <div class="hint">為亮部字元疊加柔光暈染，營造霓虹燈管或發光終端機氛圍。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>CRT 掃描線</span><span class="val-pill" id="scanlinesVal">0.00</span></div>
+            <input type="range" id="scanlines" min="0" max="1" step="0.05" value="0" />
+            <div class="hint">疊加水平深色掃描線條，重現早期陰極射線管螢幕質感。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>印刷網點 (Halftone)</span><span class="val-pill" id="halftoneVal">0.00</span></div>
+            <input type="range" id="halftone" min="0" max="1" step="0.05" value="0" />
+            <div class="hint">在畫面上覆蓋規則圓點紋理，營造復古印刷或網版海報效果。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>暗角漸暈 (Vignette)</span><span class="val-pill" id="vignetteVal">0.00</span></div>
+            <input type="range" id="vignette" min="0" max="1" step="0.05" value="0" />
+            <div class="hint">壓暗畫面四周邊角，將視覺焦點集中到中央主體。</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">數位故障與量化</div>
+          <div class="ctl">
+            <div class="ctl-row"><span>RGB 色差偏移</span><span class="val-pill" id="chromaticVal">0.0 px</span></div>
+            <input type="range" id="chromaticAberration" min="0" max="4" step="0.5" value="0" />
+            <div class="hint">將紅、藍通道往左右微幅錯開，產生鏡頭色散或賽博故障邊緣。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>數位故障斷行 (Glitch)</span><span class="val-pill" id="glitchVal">0.00</span></div>
+            <input type="range" id="glitch" min="0" max="1" step="0.05" value="0" />
+            <div class="hint">隨機將部分字元行水平偏移，模擬數位訊號干擾與錯位感。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>順序抖動 (Ordered Dither)</span><span class="val-pill" id="ditherVal">0.00</span></div>
+            <input type="range" id="dither" min="0" max="1" step="0.05" value="0" />
+            <div class="hint">透過 4×4 Bayer 矩陣重新分配亮度閾值，呈現像素印刷顆粒感。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>亮度色階化 (Posterize)</span><span class="val-pill" id="posterVal">0</span></div>
+            <input type="range" id="posterize" min="0" max="8" step="1" value="0" />
+            <div class="hint">將連續明暗壓縮成少數幾階（0 為關閉），產生大塊分明的海報層次。</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">動態循環</div>
+          <div class="ctl">
+            <label class="toggle-row">
+              <span>呼吸燈脈動（建議搭配 Bloom）</span>
+              <span class="switch"><input type="checkbox" id="animate" /><span class="slider-sw"></span></span>
+            </label>
+            <div class="hint">讓高光亮度隨正弦波週期起伏，形成會呼吸的動態光影。</div>
+          </div>
+          <div class="ctl">
+            <label class="toggle-row">
+              <span>雙色調色相循環</span>
+              <span class="switch"><input type="checkbox" id="duotoneCycle" /><span class="slider-sw"></span></span>
+            </label>
+            <div class="hint">自動隨時間旋轉雙色調的高光與陰影色相，呈現霓虹流動效果。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 半色調分頁 1：網點幾何與風格 -->
+      <div class="tab-pane" id="pane-ht-dots">
+        <div class="card">
+          <div class="card-title">一鍵半色調風格</div>
+          <div class="preset-grid">
+            <button type="button" class="btn btn-secondary btn-sm" data-ht-preset="cmyk">CMYK 彩印海報</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-ht-preset="newspaper">復古報紙 45°</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-ht-preset="popart">美式漫畫 Pop</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-ht-preset="screenprint">網版印刷 22.5°</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-ht-preset="risograph">孔版印刷 Riso</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-ht-preset="linescreen">平行線條網屏</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">輸入影像</div>
+          <div id="htDropzone" class="dropzone">
+            拖曳圖片到此，或點擊選擇檔案<br />
+            <span style="font-size: 0.7rem; color: var(--muted);">支援 PNG / JPG / WebP</span>
+          </div>
+          <div class="preset-grid">
+            <button type="button" id="htDemoBtn" class="btn btn-secondary btn-sm">光影雙球示範</button>
+            <button type="button" id="htDemoTorusBtn" class="btn btn-secondary btn-sm">立體環面示範</button>
+          </div>
+        </div>
+
+        <div class="card card-highlight">
+          <div class="card-title">網點形狀與網屏參數</div>
+          <div class="ctl">
+            <div class="ctl-row"><span>網點形狀</span></div>
+            <select id="htShape">
+              <option value="circle" selected>經典圓點 (Round Dot)</option>
+              <option value="ellipse">橢圓網點 (Elliptical)</option>
+              <option value="square">方形像素點 (Square)</option>
+              <option value="diamond">菱形網點 (Diamond)</option>
+              <option value="line">平行線條網屏 (Line Screen)</option>
+              <option value="cross">十字星芒點 (Cross)</option>
+              <option value="customSvg">自訂 SVG 圖元（匯入圖形）</option>
+            </select>
+            <div class="hint">決定每個網格單元的幾何圖形；也可選擇「自訂 SVG 圖元」匯入 Logo 或符號。</div>
+            <div id="customSvgWrap" style="display: none; flex-direction: column; gap: 6px; margin-top: 6px; padding: 8px; border-radius: 4px; background: var(--bg-panel); border: 1px solid var(--border);">
+              <div class="ctl-row" style="gap: 6px;">
+                <button type="button" id="customSvgUploadBtn" class="btn btn-secondary btn-sm" style="flex: 1;">上傳 .svg 檔案</button>
+                <svg id="customSvgPreview" viewBox="0 0 100 100" width="28" height="28" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 2px; flex-shrink: 0; color: var(--accent);"></svg>
+              </div>
+              <input type="file" id="customSvgFile" accept=".svg,image/svg+xml" hidden />
+              <input type="text" id="customSvgInput" class="mono-input" placeholder="或貼上 <svg>...</svg> / path d=&quot;...&quot;" value="M50 4 L62 38 L96 50 L62 62 L50 96 L38 62 L4 50 L38 38 Z" />
+              <div class="hint" id="customSvgStatus">目前圖元：內建四芒星向量路徑（可上傳 .svg 或貼上 &lt;path&gt; d 屬性）。</div>
+            </div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>網格排列方式</span></div>
+            <select id="htGrid">
+              <option value="square" selected>正交方格 (Square Grid)</option>
+              <option value="hex">蜂巢交錯 (Hex / Staggered)</option>
+            </select>
+            <div class="hint">蜂巢交錯可減少水平／垂直視覺條紋，讓網點分布更自然。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>網點間距（網頻大小）</span><span class="val-pill" id="htSizeVal">10 px</span></div>
+            <input type="range" id="htSize" min="4" max="36" step="1" value="10" />
+            <div class="hint">數值越小網點越細密（高 LPI），數值越大則呈現粗獷普普風圓點。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>基準網屏角度</span><span class="val-pill" id="htAngleVal">45.0°</span></div>
+            <input type="range" id="htAngle" min="0" max="90" step="0.5" value="45" />
+            <div class="hint">旋轉網點排列軸向；報紙常用 45°、網版印刷常用 22.5° 以避免摩爾紋。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>網點擴張 (Dot Gain)</span><span class="val-pill" id="htMaxScaleVal">1.05×</span></div>
+            <input type="range" id="htMaxScale" min="0.5" max="1.8" step="0.05" value="1.05" />
+            <div class="hint">控制最大網點直徑倍率，大於 1.0 會讓最深暗部的網點彼此相連融合成實色。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>最小網點閾值</span><span class="val-pill" id="htMinDotVal">0.03</span></div>
+            <input type="range" id="htMinDot" min="0" max="0.35" step="0.01" value="0.03" />
+            <div class="hint">過濾極亮區域過小的雜點，模擬網版印刷保留純白高光的特性。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>網點邊緣柔化</span><span class="val-pill" id="htSoftnessVal">0.00</span></div>
+            <input type="range" id="htSoftness" min="0" max="0.8" step="0.02" value="0" />
+            <div class="hint">0 為銳利向量硬邊，調高可模擬油墨滲入紙纖維的柔邊暈染感。</div>
+          </div>
+          <div class="ctl">
+            <label class="toggle-row">
+              <span>反轉網點大小（深色底發光模式）</span>
+              <span class="switch"><input type="checkbox" id="htInvert" /><span class="slider-sw"></span></span>
+            </label>
+            <div class="hint">關閉時「暗部大點」（白紙印刷）；開啟時「亮部大點」（適合深色底或霓虹發光）。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 半色調分頁 2：CMYK 與色彩分離 -->
+      <div class="tab-pane" id="pane-ht-color">
+        <div class="card card-highlight">
+          <div class="card-title">半色調色彩分離</div>
+          <div class="ctl">
+            <div class="ctl-row"><span>分色渲染模式</span></div>
+            <select id="htColorMode">
+              <option value="cmyk" selected>CMYK 四色印刷分色（C/M/Y/K 獨立網屏）</option>
+              <option value="mono">單色油墨網點（報紙 / 網版單色）</option>
+              <option value="rgb">原圖全彩網點（保留原圖 RGB）</option>
+              <option value="duotone">雙色調網點（高光 / 陰影漸層）</option>
+            </select>
+            <div class="hint">CMYK 會拆出青、洋紅、黃、黑四張不同角度的網版疊印，重現真實彩印玫瑰花紋。</div>
+          </div>
+
+          <div id="htCmykWrap" style="display: flex; flex-direction: column; gap: 10px;">
+            <div class="ctl">
+              <div class="ctl-row"><span>CMYK 四版網屏角度 (°)</span></div>
+              <div class="cmyk-angle-grid">
+                <div>
+                  <div class="ctl-row" style="font-size: 0.72rem;"><span style="color: #22d3ee;">C 青版</span><span class="val-pill" id="htAngleCVal">15°</span></div>
+                  <input type="range" id="htAngleC" min="0" max="90" step="1" value="15" />
+                </div>
+                <div>
+                  <div class="ctl-row" style="font-size: 0.72rem;"><span style="color: #f472b6;">M 洋紅</span><span class="val-pill" id="htAngleMVal">75°</span></div>
+                  <input type="range" id="htAngleM" min="0" max="90" step="1" value="75" />
+                </div>
+                <div>
+                  <div class="ctl-row" style="font-size: 0.72rem;"><span style="color: #fde047;">Y 黃版</span><span class="val-pill" id="htAngleYVal">0°</span></div>
+                  <input type="range" id="htAngleY" min="0" max="90" step="1" value="0" />
+                </div>
+                <div>
+                  <div class="ctl-row" style="font-size: 0.72rem;"><span style="color: #cbd5e1;">K 黑版</span><span class="val-pill" id="htAngleKVal">45°</span></div>
+                  <input type="range" id="htAngleK" min="0" max="90" step="1" value="45" />
+                </div>
+              </div>
+              <div class="hint">標準印刷抗摩爾紋角度為 C:15°、M:75°、Y:0°、K:45°，可自由微調觀察干涉花紋。</div>
+            </div>
+            <div class="ctl">
+              <div class="ctl-row"><span>四色油墨疊印混合</span></div>
+              <select id="htInkBlend">
+                <option value="multiply" selected>減法正片疊底 (Multiply · 亮紙印刷)</option>
+                <option value="screen">加法濾色發光 (Screen · 深色發光)</option>
+                <option value="source-over">不透明覆蓋 (Normal)</option>
+              </select>
+              <div class="hint">亮白紙底建議用「正片疊底」模擬真實油墨疊色；深色底或去背建議試用「Normal」或「濾色」。</div>
+            </div>
+          </div>
+
+          <div id="htMonoWrap" style="display: none;">
+            <div class="ctl">
+              <div class="ctl-row"><span>單色油墨顏色</span><input type="color" id="htInkColor" value="#111827" /></div>
+              <div class="hint">設定單色印刷油墨色號（例如深黑報紙墨、孔版螢光藍或白色 T 恤油墨）。</div>
+            </div>
+          </div>
+
+          <div id="htDuoWrap" style="display: none; flex-direction: column; gap: 10px;">
+            <div class="ctl">
+              <div class="ctl-row"><span>雙色調高光網點色</span><input type="color" id="htDuoHi" value="#f43f5e" /></div>
+              <div class="ctl-row"><span>雙色調陰影網點色</span><input type="color" id="htDuoSh" value="#1e1b4b" /></div>
+              <div class="hint">依原圖明暗在兩種油墨色之間平滑過渡，呈現雙色孔版印刷海報感。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">背景紙張與去背</div>
+          <div class="ctl">
+            <div class="ctl-row"><span>畫布背景模式（與全域同步）</span></div>
+            <select id="htBgSync">
+              <option value="dark">復古黑底 (#0a0d12)</option>
+              <option value="light" selected>亮白紙底 (#f7f8fa)</option>
+              <option value="navy">終端深藍 (#091933)</option>
+              <option value="complementary">原圖互補色背景（自動）</option>
+              <option value="custom">自訂色號（RGB / CMYK）</option>
+            </select>
+            <div class="hint">CMYK 與單色印刷建議選「亮白紙底」或「自訂色號」；也可直接勾選右下角的「去背模式輸出」。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 半色調分頁 3：色調與印刷質感 -->
+      <div class="tab-pane" id="pane-ht-fx">
+        <div class="card">
+          <div class="card-title">取樣訊號通道 (Signal)</div>
+          <div class="ctl">
+            <div class="ctl-row"><span>網點大小驅動訊號</span></div>
+            <select id="htSignal">
+              <option value="luma" selected>亮度 (Luma · 預設)</option>
+              <option value="sat">飽和度 (Saturation)</option>
+              <option value="hue">色相角度 (Hue)</option>
+              <option value="red">紅色通道 (Red)</option>
+              <option value="green">綠色通道 (Green)</option>
+              <option value="blue">藍色通道 (Blue)</option>
+            </select>
+            <div class="hint">切換驅動網點直徑的影像訊號；CMYK 模式選用非亮度通道時會依該訊號調節油墨強度。</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">色調與階調曲線</div>
+          <div class="ctl">
+            <div class="ctl-row"><span>網點對比度</span><span class="val-pill" id="htContrastVal">1.15</span></div>
+            <input type="range" id="htContrast" min="0.5" max="2.5" step="0.05" value="1.15" />
+            <div class="hint">拉大亮暗網點直徑差異，讓高光更乾淨、陰影更飽滿。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>網點亮度補償</span><span class="val-pill" id="htBrightnessVal">1.00</span></div>
+            <input type="range" id="htBrightness" min="0.5" max="1.8" step="0.05" value="1.0" />
+            <div class="hint">整體調整曝光度，決定網點偏向稀疏留白或濃密飽滿。</div>
+          </div>
+          <div class="ctl">
+            <label class="toggle-row">
+              <span>自動色階擴展 (Auto Levels)</span>
+              <span class="switch"><input type="checkbox" id="htAutoLevels" checked /><span class="slider-sw"></span></span>
+            </label>
+            <div class="hint">自動將平淡灰階影像拉伸至完整黑到白範圍，確保網點大小層次分明。</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">實體印刷瑕疵與紋理</div>
+          <div class="ctl">
+            <div class="ctl-row"><span>套版錯位偏移 (Misprint)</span><span class="val-pill" id="htMisprintVal">0.0 px</span></div>
+            <input type="range" id="htMisprint" min="0" max="12" step="0.5" value="0" />
+            <div class="hint">讓 CMYK 各色版產生微幅錯位（或單色網點有機抖動），模擬復古孔版印刷手工對位感。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>紙張纖維顆粒</span><span class="val-pill" id="htPaperGrainVal">0.00</span></div>
+            <input type="range" id="htPaperGrain" min="0" max="0.35" step="0.02" value="0" />
+            <div class="hint">在畫面上疊加細緻印刷紙質噪點，減少數位純色平塗感。</div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-row"><span>海報暗角 (Vignette)</span><span class="val-pill" id="htVignetteVal">0.00</span></div>
+            <input type="range" id="htVignette" min="0" max="0.8" step="0.05" value="0" />
+            <div class="hint">壓暗畫面四周邊緣，強化印刷海報的視覺聚焦效果。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-footer">
+      <select id="exportRes" class="mono-input" style="grid-column: 1 / -1;" title="PNG 匯出解析度（以長邊計算）">
+        <option value="1x">PNG 解析度：1× 原尺寸</option>
+        <option value="2x" selected>PNG 解析度：2× 高解析</option>
+        <option value="1920">PNG 解析度：Full HD · 長邊 1920</option>
+        <option value="2560">PNG 解析度：2K QHD · 長邊 2560</option>
+        <option value="3840">PNG 解析度：4K UHD · 長邊 3840</option>
+        <option value="5120">PNG 解析度：5K · 長邊 5120</option>
+        <option value="7680">PNG 解析度：8K UHD · 長邊 7680</option>
+      </select>
+      <button type="button" id="resetBtn" class="btn btn-secondary">重設預設值</button>
+      <button type="button" id="exportBtn" class="btn">匯出 PNG</button>
+      <button type="button" id="exportSvgBtn" class="btn btn-secondary">匯出 SVG</button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div class="status-group">
+        <span class="chip chip-mono" id="gridBadge">220 × 80 字元</span>
+        <span class="chip chip-mono" id="inkBadge" title="預估油墨／字元面積覆蓋率">覆蓋率 --%</span>
+        <span class="chip">背景 <span class="bg-swatch" id="bgSwatch"></span><span class="chip-mono" id="bgHexLabel">#0a0d12</span></span>
+        <span class="chip" id="stackBadge" style="border-color: rgba(255, 77, 0, 0.45); color: var(--accent);">字元堆疊：3D 擠出 4 層</span>
+      </div>
+      <div class="topbar-actions">
+        <select id="aspectCrop" style="width: auto; padding: 5px 8px; font-size: 0.73rem; font-family: var(--mono);" title="置中裁切畫布比例">
+          <option value="source" selected>比例：原圖</option>
+          <option value="1:1">1:1 正方</option>
+          <option value="4:5">4:5 直式</option>
+          <option value="3:4">3:4 海報</option>
+          <option value="9:16">9:16 限動</option>
+          <option value="16:9">16:9 寬幕</option>
+          <option value="3:2">3:2 相機</option>
+        </select>
+        <button type="button" id="fitBtn" class="btn btn-secondary">切換 100% / 適應視窗</button>
+        <button type="button" id="copyTextBtn" class="btn btn-secondary">複製純文字 ASCII</button>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="canvas-frame" id="canvasFrame">
+        <div class="canvas-stage-wrap" id="canvasStageWrap">
+          <canvas id="asciiCanvas"></canvas>
+          <svg id="outputSvg" class="fit-mode" xmlns="http://www.w3.org/2000/svg" style="display: none;"></svg>
+          <canvas id="origCompareCanvas" class="orig-compare-canvas" hidden></canvas>
+          <div id="compareDivider" class="compare-divider" hidden>
+            <div class="compare-handle">◀ ▶</div>
+          </div>
+          <span id="compareTagLeft" class="compare-tag compare-tag-left" hidden>原圖</span>
+          <span id="compareTagRight" class="compare-tag compare-tag-right" hidden>渲染結果</span>
+        </div>
+      </div>
+    </div>
+    <canvas id="workCanvas" hidden></canvas>
+
+    <div class="floating-left-bar">
+      <label class="floating-opt-pill" title="開啟後可在畫布上左右拖曳分割線比對原圖與渲染結果">
+        <input type="checkbox" id="compareToggle" />
+        <span>比對原圖</span>
+      </label>
+      <div class="floating-opt-pill" title="開啟後移動滑鼠到畫布上即可放大檢視細節">
+        <label style="display: inline-flex; align-items: center; gap: 7px; cursor: pointer;">
+          <input type="checkbox" id="magnifierToggle" />
+          <span>放大鏡</span>
+        </label>
+        <select id="magnifierZoom" class="mini-zoom-select" style="display: none;">
+          <option value="2">2×</option>
+          <option value="3" selected>3×</option>
+          <option value="5">5×</option>
+        </select>
+      </div>
+    </div>
+  </main>
+
+  <div id="magnifierLens" class="magnifier-lens" hidden>
+    <svg id="magnifierSvg" width="176" height="176" xmlns="http://www.w3.org/2000/svg"></svg>
+    <canvas id="magnifierCanvas" style="display: none;"></canvas>
+    <div class="magnifier-crosshair"></div>
+    <span class="magnifier-badge" id="magnifierBadge">3×</span>
+  </div>
+
+  <label class="floating-output-opt" title="勾選後畫布背景變為透明，匯出 PNG 將保留去背 Alpha 通道">
+    <input type="checkbox" id="transparentBg" />
+    <span>去背模式輸出（透明 PNG）</span>
+  </label>
+
+  <div class="toast" id="toast">已複製到剪貼簿</div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const els = {
+      dropzone: $("dropzone"),
+      fileInput: $("fileInput"),
+      demoBtn: $("demoBtn"),
+      demoTorusBtn: $("demoTorusBtn"),
+      rampPreset: $("rampPreset"),
+      customRampWrap: $("customRampWrap"),
+      customRamp: $("customRamp"),
+      bgMode: $("bgMode"),
+      customBgWrap: $("customBgWrap"),
+      customBgFormat: $("customBgFormat"),
+      customBgInput: $("customBgInput"),
+      customBgPreview: $("customBgPreview"),
+      customBgParsed: $("customBgParsed"),
+      customBgHint: $("customBgHint"),
+      canvasFrame: $("canvasFrame"),
+      transparentBg: $("transparentBg"),
+      autoInvertRamp: $("autoInvertRamp"),
+      manualInvert: $("manualInvert"),
+      layoutMode: $("layoutMode"),
+      cols: $("cols"),
+      colsVal: $("colsVal"),
+      aspect: $("aspect"),
+      aspectVal: $("aspectVal"),
+      colorMode: $("colorMode"),
+      duotonePreset: $("duotonePreset"),
+      highlightColor: $("highlightColor"),
+      shadowColor: $("shadowColor"),
+      colorMix: $("colorMix"),
+      colorMixVal: $("colorMixVal"),
+      blendMode: $("blendMode"),
+      duotoneHint: $("duotoneHint"),
+      contrast: $("contrast"),
+      contrastVal: $("contrastVal"),
+      brightness: $("brightness"),
+      brightVal: $("brightVal"),
+      saturation: $("saturation"),
+      saturationVal: $("saturationVal"),
+      hueShift: $("hueShift"),
+      hueShiftVal: $("hueShiftVal"),
+      autoContrast: $("autoContrast"),
+      colorInvert: $("colorInvert"),
+      stackMode: $("stackMode"),
+      stackModeHint: $("stackModeHint"),
+      stackLayers: $("stackLayers"),
+      stackLayersVal: $("stackLayersVal"),
+      stackDepth: $("stackDepth"),
+      stackDepthVal: $("stackDepthVal"),
+      stackAngle: $("stackAngle"),
+      stackAngleVal: $("stackAngleVal"),
+      stackFade: $("stackFade"),
+      stackFadeVal: $("stackFadeVal"),
+      stackScale: $("stackScale"),
+      stroke: $("stroke"),
+      strokeVal: $("strokeVal"),
+      emboss: $("emboss"),
+      embossVal: $("embossVal"),
+      edge: $("edge"),
+      edgeVal: $("edgeVal"),
+      bloom: $("bloom"),
+      bloomVal: $("bloomVal"),
+      scanlines: $("scanlines"),
+      scanlinesVal: $("scanlinesVal"),
+      halftone: $("halftone"),
+      halftoneVal: $("halftoneVal"),
+      vignette: $("vignette"),
+      vignetteVal: $("vignetteVal"),
+      chromaticAberration: $("chromaticAberration"),
+      chromaticVal: $("chromaticVal"),
+      glitch: $("glitch"),
+      glitchVal: $("glitchVal"),
+      dither: $("dither"),
+      ditherVal: $("ditherVal"),
+      posterize: $("posterize"),
+      posterVal: $("posterVal"),
+      animate: $("animate"),
+      duotoneCycle: $("duotoneCycle"),
+      resetBtn: $("resetBtn"),
+      exportBtn: $("exportBtn"),
+      exportRes: $("exportRes"),
+      fitBtn: $("fitBtn"),
+      copyTextBtn: $("copyTextBtn"),
+      gridBadge: $("gridBadge"),
+      bgSwatch: $("bgSwatch"),
+      bgHexLabel: $("bgHexLabel"),
+      stackBadge: $("stackBadge"),
+      outputSvg: $("outputSvg"),
+      asciiCanvas: $("asciiCanvas"),
+      magnifierCanvas: $("magnifierCanvas"),
+      exportSvgBtn: $("exportSvgBtn"),
+      canvasStageWrap: $("canvasStageWrap"),
+      origCompareCanvas: $("origCompareCanvas"),
+      compareDivider: $("compareDivider"),
+      compareTagLeft: $("compareTagLeft"),
+      compareTagRight: $("compareTagRight"),
+      compareToggle: $("compareToggle"),
+      magnifierToggle: $("magnifierToggle"),
+      magnifierZoom: $("magnifierZoom"),
+      magnifierLens: $("magnifierLens"),
+      magnifierSvg: $("magnifierSvg"),
+      magnifierBadge: $("magnifierBadge"),
+      workCanvas: $("workCanvas"),
+      toast: $("toast"),
+      asciiTabs: $("asciiTabs"),
+      halftoneTabs: $("halftoneTabs"),
+      htDropzone: $("htDropzone"),
+      htDemoBtn: $("htDemoBtn"),
+      htDemoTorusBtn: $("htDemoTorusBtn"),
+      htShape: $("htShape"),
+      htGrid: $("htGrid"),
+      htSize: $("htSize"),
+      htSizeVal: $("htSizeVal"),
+      htAngle: $("htAngle"),
+      htAngleVal: $("htAngleVal"),
+      htMaxScale: $("htMaxScale"),
+      htMaxScaleVal: $("htMaxScaleVal"),
+      htMinDot: $("htMinDot"),
+      htMinDotVal: $("htMinDotVal"),
+      htSoftness: $("htSoftness"),
+      htSoftnessVal: $("htSoftnessVal"),
+      htInvert: $("htInvert"),
+      htColorMode: $("htColorMode"),
+      htCmykWrap: $("htCmykWrap"),
+      htMonoWrap: $("htMonoWrap"),
+      htDuoWrap: $("htDuoWrap"),
+      htAngleC: $("htAngleC"),
+      htAngleCVal: $("htAngleCVal"),
+      htAngleM: $("htAngleM"),
+      htAngleMVal: $("htAngleMVal"),
+      htAngleY: $("htAngleY"),
+      htAngleYVal: $("htAngleYVal"),
+      htAngleK: $("htAngleK"),
+      htAngleKVal: $("htAngleKVal"),
+      htInkBlend: $("htInkBlend"),
+      htInkColor: $("htInkColor"),
+      htDuoHi: $("htDuoHi"),
+      htDuoSh: $("htDuoSh"),
+      htBgSync: $("htBgSync"),
+      asciiSignal: $("asciiSignal"),
+      htSignal: $("htSignal"),
+      inkBadge: $("inkBadge"),
+      aspectCrop: $("aspectCrop"),
+      customSvgWrap: $("customSvgWrap"),
+      customSvgUploadBtn: $("customSvgUploadBtn"),
+      customSvgFile: $("customSvgFile"),
+      customSvgInput: $("customSvgInput"),
+      customSvgPreview: $("customSvgPreview"),
+      customSvgStatus: $("customSvgStatus"),
+      htContrast: $("htContrast"),
+      htContrastVal: $("htContrastVal"),
+      htBrightness: $("htBrightness"),
+      htBrightnessVal: $("htBrightnessVal"),
+      htAutoLevels: $("htAutoLevels"),
+      htMisprint: $("htMisprint"),
+      htMisprintVal: $("htMisprintVal"),
+      htPaperGrain: $("htPaperGrain"),
+      htPaperGrainVal: $("htPaperGrainVal"),
+      htVignette: $("htVignette"),
+      htVignetteVal: $("htVignetteVal")
+    };
+
+    const DUOTONE_PRESETS = {
+      amber:       { shadow: "#1E1B4B", highlight: "#F59E0B", label: "暗夜琥珀 — 溫暖電影感" },
+      pinkOcean:   { shadow: "#1E3A5F", highlight: "#EC4899", label: "錯覺海洋 — 鮮豔粉藍" },
+      cyanPurple:  { shadow: "#7C3AED", highlight: "#22D3EE", label: "霓虹紫 — 科技冷暖" },
+      forestCream: { shadow: "#14532D", highlight: "#FEF3C7", label: "森林奶油 — 自然層次" },
+      noirRose:    { shadow: "#111827", highlight: "#FDA4AF", label: "黑玫瑰 — 沉鬱優雅" },
+      synthwave:   { shadow: "#561C90", highlight: "#FF0055", label: "合成波 — 80 年代霓虹" },
+      cyberpunk:   { shadow: "#7000FF", highlight: "#00F2FF", label: "賽博龐克 — 紫藍電光" },
+      ocean:       { shadow: "#002B5C", highlight: "#4CC9F0", label: "深海青 — 清爽透亮" },
+      fire:        { shadow: "#3A1C00", highlight: "#FF6B00", label: "烈焰橘 — 炙熱高反差" },
+      sepia:       { shadow: "#3E2723", highlight: "#D4AF37", label: "古典褐 — 懷舊金屬" }
+    };
+
+    const STACK_HINTS = {
+      extrude: "3D 擠出堆疊：從陰影底層到高光頂層連續位移疊繪，創造厚實的立體字塊與空間景深。",
+      parallax: "視差浮雕堆疊：依像素亮度決定 Z 軸抬升高度，亮部浮出畫面、暗部下沉，立體浮雕感最強。",
+      overprint: "雙層字元疊印：底層以粗密結構字元偏移襯底，頂層疊上精細字元，兼顧筆畫厚度與細節。",
+      off: "關閉堆疊：使用傳統單層平面 ASCII 繪製。"
+    };
+
+    const BAYER_4X4 = [
+      [0, 8, 2, 10],
+      [12, 4, 14, 6],
+      [3, 11, 1, 9],
+      [15, 7, 13, 5]
+    ];
+
+    let appMode = "ascii";
+    let currentImg = null;
+    let lastAsciiText = "";
+    let animPhase = 0;
+    let animRaf = null;
+    let cycleRaf = null;
+    let cycleHue = 0;
+
+    function showToast(msg) {
+      els.toast.textContent = msg;
+      els.toast.classList.add("show");
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => els.toast.classList.remove("show"), 1800);
+    }
+
+    let compareSplitPct = 50;
+
+    // svgWidth/svgHeight：輸出像素尺寸（匯出用）
+    // vbW/vbH：SVG viewBox 座標單位（半色調拖曳預覽時與像素尺寸不同）
+    // contentRect：影像實際內容在 viewBox 中的位置（ASCII 堆疊模式有 pad 內縮）
+    let svgWidth = 960;
+    let svgHeight = 540;
+    let vbW = 960;
+    let vbH = 540;
+    let contentRect = { x: 0, y: 0, w: 960, h: 540 };
+    let lastOrigDataUrl = "";
+
+    // 影像身分序號（快取鍵用）
+    let imgSerial = 0;
+    function setCurrentImage(img) {
+      img._rlId = ++imgSerial;
+      currentImg = img;
+    }
+
+    // 取樣像素快取：參數未變時不重複 drawImage + getImageData
+    let workCtx = null;
+    const pixelCache = { key: "", data: null, hasAlpha: false };
+    // 低於此 alpha 的像素視為透明（去背 PNG 的背景）
+    const ALPHA_CUTOFF = 128;
+    function getSourcePixels(crop, w, h) {
+      const key = `${currentImg._rlId}|${crop.sx},${crop.sy},${crop.sw},${crop.sh}|${w}x${h}`;
+      if (pixelCache.key === key && pixelCache.data) return pixelCache.data;
+      const work = els.workCanvas;
+      if (!workCtx) workCtx = work.getContext("2d", { willReadFrequently: true });
+      work.width = w;
+      work.height = h;
+      workCtx.drawImage(currentImg, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, w, h);
+      pixelCache.data = workCtx.getImageData(0, 0, w, h).data;
+      pixelCache.key = key;
+      // 偵測是否為帶透明通道的去背圖
+      let hasAlpha = false;
+      const d = pixelCache.data;
+      for (let i = 3; i < d.length; i += 4) {
+        if (d[i] < 250) { hasAlpha = true; break; }
+      }
+      pixelCache.hasAlpha = hasAlpha;
+      return pixelCache.data;
+    }
+
+    // 色彩量化（每通道 32 階），用於合併同色字元／網點以減少 DOM 節點
+    function quantHex(r, g, b, stepSize = 8) {
+      const q = (v) => {
+        const n = Math.round(v / stepSize) * stepSize;
+        return n > 255 ? 255 : n < 0 ? 0 : n;
+      };
+      return rgbToHex(q(r), q(g), q(b));
+    }
+
+    // 可重現的偽亂數（Glitch 位移不再每次重繪都跳動）
+    function mulberry32(seed) {
+      let a = seed >>> 0;
+      return () => {
+        a = (a + 0x6d2b79f5) >>> 0;
+        let t = a;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function getSourceCropRect(img) {
+      const iw = img.width || 1;
+      const ih = img.height || 1;
+      const val = els.aspectCrop ? els.aspectCrop.value : "source";
+      if (!val || val === "source") {
+        return { sx: 0, sy: 0, sw: iw, sh: ih };
+      }
+      const parts = val.split(":").map(Number);
+      if (parts.length !== 2 || !parts[0] || !parts[1]) {
+        return { sx: 0, sy: 0, sw: iw, sh: ih };
+      }
+      const targetRatio = parts[0] / parts[1];
+      const srcRatio = iw / ih;
+      if (Math.abs(srcRatio - targetRatio) < 0.005) {
+        return { sx: 0, sy: 0, sw: iw, sh: ih };
+      }
+      if (srcRatio > targetRatio) {
+        const sw = ih * targetRatio;
+        return { sx: (iw - sw) * 0.5, sy: 0, sw, sh: ih };
+      } else {
+        const sh = iw / targetRatio;
+        return { sx: 0, sy: (ih - sh) * 0.5, sw: iw, sh };
+      }
+    }
+
+    function getSignalValue(r, g, b, mode) {
+      if (mode === "red") return r / 255;
+      if (mode === "green") return g / 255;
+      if (mode === "blue") return b / 255;
+      if (mode === "sat" || mode === "hue") {
+        const rn = r / 255, gn = g / 255, bn = b / 255;
+        const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+        const d = max - min;
+        if (mode === "sat") {
+          return max === 0 ? 0 : d / max;
+        }
+        if (d === 0) return 0;
+        let h = 0;
+        if (max === rn) h = (gn - bn) / d + (gn < bn ? 6 : 0);
+        else if (max === gn) h = (bn - rn) / d + 2;
+        else h = (rn - gn) / d + 4;
+        return (h / 6);
+      }
+      return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    }
+
+    let customSvgGlyph = {
+      viewBox: "0 0 100 100",
+      inner: '<path d="M50 4 L62 38 L96 50 L62 62 L50 96 L38 62 L4 50 L38 38 Z" fill="currentColor"/>'
+    };
+
+    function parseCustomSvgSource(raw) {
+      const str = (raw || "").trim();
+      if (!str) return null;
+      let innerHtml = "";
+      let vb = "";
+
+      if (str.includes("<")) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(str.includes("<svg") ? str : `<svg xmlns="http://www.w3.org/2000/svg">${str}</svg>`, "image/svg+xml");
+        const svgEl = doc.querySelector("svg");
+        if (!svgEl || doc.querySelector("parsererror")) return null;
+        vb = svgEl.getAttribute("viewBox") || "";
+        const allowed = svgEl.querySelectorAll("path, circle, rect, polygon, polyline, ellipse, line");
+        if (!allowed.length) return null;
+        const parts = [];
+        allowed.forEach((node) => {
+          const clone = node.cloneNode(false);
+          // 移除事件屬性與外部參照，避免貼入的 SVG 夾帶腳本
+          Array.from(clone.attributes).forEach((a) => {
+            const n = a.name.toLowerCase();
+            if (n.startsWith("on") || n === "href" || n === "xlink:href" || n === "filter" || n === "mask" || n === "clip-path") {
+              clone.removeAttribute(a.name);
+            }
+          });
+          const f = clone.getAttribute("fill");
+          if (f !== "none") clone.setAttribute("fill", "currentColor");
+          const st = clone.getAttribute("stroke");
+          if (st && st !== "none") clone.setAttribute("stroke", "currentColor");
+          clone.removeAttribute("class");
+          clone.removeAttribute("style");
+          parts.push(new XMLSerializer().serializeToString(clone));
+        });
+        innerHtml = parts.join("");
+      } else {
+        innerHtml = `<path d="${escapeXml(str)}" fill="currentColor"/>`;
+      }
+
+      if (!vb) {
+        const probe = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        probe.setAttribute("style", "position:fixed;left:-9999px;top:-9999px;width:200px;height:200px;visibility:hidden;");
+        probe.innerHTML = `<g>${innerHtml}</g>`;
+        document.body.appendChild(probe);
+        try {
+          const bbox = probe.firstChild.getBBox();
+          if (bbox && bbox.width > 0 && bbox.height > 0) {
+            const size = Math.max(bbox.width, bbox.height);
+            const cx = bbox.x + bbox.width * 0.5;
+            const cy = bbox.y + bbox.height * 0.5;
+            vb = `${(cx - size * 0.5).toFixed(2)} ${(cy - size * 0.5).toFixed(2)} ${size.toFixed(2)} ${size.toFixed(2)}`;
+          }
+        } catch {}
+        probe.remove();
+      }
+
+      if (!vb) vb = "0 0 100 100";
+      return { viewBox: vb, inner: innerHtml };
+    }
+
+    function updateCustomSvgPreview(parsed, label) {
+      if (!parsed) {
+        if (els.customSvgStatus) {
+          els.customSvgStatus.textContent = "無法解析 SVG（請確認為有效的 <svg> 或 <path> d 路徑）。";
+          els.customSvgStatus.style.color = "#dc2626";
+        }
+        return false;
+      }
+      customSvgGlyph = parsed;
+      if (els.customSvgPreview) {
+        els.customSvgPreview.setAttribute("viewBox", parsed.viewBox);
+        els.customSvgPreview.innerHTML = parsed.inner;
+      }
+      if (els.customSvgStatus) {
+        els.customSvgStatus.textContent = label || "已載入自訂向量圖元。";
+        els.customSvgStatus.style.color = "var(--muted)";
+      }
+      return true;
+    }
+
+    function escapeXml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    // 放大鏡：結構只在必要時重建；平常只刷新 <use> 參照與分割線位置
+    let magBuiltKey = "";
+    function updateMagnifierSplit() {
+      const splitX = ((compareSplitPct / 100) * vbW).toFixed(2);
+      const clipRect = els.magnifierSvg.querySelector("#magOrigClip rect");
+      const splitLine = els.magnifierSvg.querySelector("#magSplitLine");
+      if (clipRect) clipRect.setAttribute("width", splitX);
+      if (splitLine) {
+        splitLine.setAttribute("x1", splitX);
+        splitLine.setAttribute("x2", splitX);
+      }
+    }
+
+    function syncMagnifierSvg() {
+      if (!els.magnifierSvg || !els.magnifierToggle) return;
+      if (!els.magnifierToggle.checked) {
+        els.magnifierSvg.innerHTML = "";
+        magBuiltKey = "";
+        return;
+      }
+      const isTransparent = els.transparentBg && els.transparentBg.checked;
+      els.magnifierLens.classList.toggle("transparent-preview", isTransparent);
+      const asciiLens = appMode === "ascii";
+      els.magnifierCanvas.style.display = asciiLens ? "block" : "none";
+      els.magnifierSvg.style.display = asciiLens ? "none" : "block";
+      if (asciiLens) {
+        // ASCII 放大鏡改由 Canvas 直接重繪，不再以 <use> 複製整個場景
+        if (magBuiltKey) { els.magnifierSvg.innerHTML = ""; magBuiltKey = ""; }
+        return;
+      }
+      const showOrig = els.compareToggle && els.compareToggle.checked && !!lastOrigDataUrl;
+      const key = `${showOrig ? compareKey : "none"}|${vbW}x${vbH}`;
+      if (key !== magBuiltKey) {
+        let html = `<g id="magRenderGroup" style="isolation: isolate;"><use href="#svgSceneRoot"/></g>`;
+        if (showOrig) {
+          html += `<defs><clipPath id="magOrigClip"><rect x="0" y="0" width="0" height="${vbH}" /></clipPath></defs>`;
+          html += `<image href="${lastOrigDataUrl}" x="0" y="0" width="${vbW}" height="${vbH}" preserveAspectRatio="none" clip-path="url(#magOrigClip)" />`;
+          html += `<line id="magSplitLine" x1="0" y1="0" x2="0" y2="${vbH}" stroke="#ff4d00" stroke-width="2" />`;
+        }
+        els.magnifierSvg.innerHTML = html;
+        magBuiltKey = key;
+      } else {
+        // 場景根節點已被重建：重新掛上 <use> 以確保參照到新節點
+        const u = els.magnifierSvg.querySelector("use");
+        if (u) u.replaceWith(u.cloneNode(false));
+      }
+      updateMagnifierSplit();
+    }
+
+    // 原圖比對：只有在影像／裁切／畫布尺寸改變時才重畫與重新編碼 PNG
+    let compareKey = "";
+    let compareCtx = null;
+    function syncCompareCanvas() {
+      const active = els.compareToggle && els.compareToggle.checked && !!currentImg;
+      els.origCompareCanvas.hidden = !active;
+      els.compareDivider.hidden = !active;
+      els.compareTagLeft.hidden = !active;
+      els.compareTagRight.hidden = !active;
+      if (!active) {
+        syncMagnifierSvg();
+        return;
+      }
+
+      const orig = els.origCompareCanvas;
+      const crop = getSourceCropRect(currentImg);
+      const cr = contentRect;
+      const key = `${currentImg._rlId}|${crop.sx},${crop.sy},${crop.sw},${crop.sh}|${svgWidth}x${svgHeight}|${vbW}x${vbH}|${cr.x},${cr.y},${cr.w.toFixed(1)},${cr.h.toFixed(1)}`;
+      if (key !== compareKey) {
+        if (orig.width !== svgWidth || orig.height !== svgHeight) {
+          orig.width = svgWidth;
+          orig.height = svgHeight;
+        }
+        if (!compareCtx) compareCtx = orig.getContext("2d");
+        const kx = svgWidth / vbW;
+        const ky = svgHeight / vbH;
+        compareCtx.clearRect(0, 0, orig.width, orig.height);
+        // 原圖對齊實際內容區（排除 ASCII 堆疊的 pad 邊界）
+        compareCtx.drawImage(currentImg, crop.sx, crop.sy, crop.sw, crop.sh, cr.x * kx, cr.y * ky, cr.w * kx, cr.h * ky);
+        compareKey = key;
+        lastOrigDataUrl = "";
+      }
+      // PNG 編碼很貴：只在放大鏡開啟且不在拖曳滑桿時進行
+      if (appMode === "halftone" && els.magnifierToggle && els.magnifierToggle.checked && !lastOrigDataUrl && !isInteractiveDrag) {
+        lastOrigDataUrl = orig.toDataURL("image/png");
+      }
+      els.canvasStageWrap.style.setProperty("--split", `${compareSplitPct}%`);
+      syncMagnifierSvg();
+    }
+
+    let isInteractiveDrag = false;
+    let activeSlideEl = null;
+    let renderRaf = null;
+    function scheduleRender() {
+      if (renderRaf) return;
+      renderRaf = requestAnimationFrame(() => {
+        renderRaf = null;
+        renderCurrentMode();
+      });
+    }
+
+    function renderCurrentMode() {
+      cachedSvgRect = null;
+      if (appMode === "halftone") {
+        renderHalftone();
+      } else {
+        renderASCII();
+      }
+      syncCompareCanvas();
+      updateExportResLabels();
+    }
+
+    const modeBgState = { ascii: "dark", halftone: "light" };
+
+    // 頂層模式切換 (ASCII vs 半色調)
+    document.querySelectorAll(".mode-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const nextMode = btn.dataset.appMode;
+        if (nextMode === appMode) return;
+        modeBgState[appMode] = els.bgMode.value;
+        appMode = nextMode;
+        document.querySelectorAll(".mode-btn").forEach((b) => b.classList.toggle("active", b === btn));
+
+        const isHt = appMode === "halftone";
+        els.asciiTabs.hidden = isHt;
+        els.halftoneTabs.hidden = !isHt;
+        els.copyTextBtn.style.display = isHt ? "none" : "";
+
+        // 切換模式時套用該模式各自的背景設定（ASCII 預設黑底、半色調預設亮白紙底）
+        const targetBg = modeBgState[appMode] || (isHt ? "light" : "dark");
+        els.bgMode.value = targetBg;
+        if (els.htBgSync) els.htBgSync.value = targetBg;
+        els.customBgWrap.style.display = targetBg === "custom" ? "flex" : "none";
+
+        const activeTabGroup = isHt ? els.halftoneTabs : els.asciiTabs;
+        const activeTabBtn = activeTabGroup.querySelector(".tab-btn.active") || activeTabGroup.querySelector(".tab-btn");
+        document.querySelectorAll(".tab-pane").forEach((p) => p.classList.remove("active"));
+        if (activeTabBtn) {
+          activeTabBtn.classList.add("active");
+          const pane = $("pane-" + activeTabBtn.dataset.tab);
+          if (pane) pane.classList.add("active");
+        }
+
+        renderCurrentMode();
+        if (!isHt) {
+          if (els.animate.checked) startAnimLoop();
+          if (els.duotoneCycle.checked) startCycleLoop();
+        }
+      });
+    });
+
+    // 分頁切換（依目前所屬 tabs 群組各自切換）
+    document.querySelectorAll(".tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const parentTabs = btn.closest(".tabs");
+        parentTabs.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+        document.querySelectorAll(".tab-pane").forEach((p) => p.classList.remove("active"));
+        btn.classList.add("active");
+        $("pane-" + btn.dataset.tab).classList.add("active");
+      });
+    });
+
+    // 工具函式
+    function clamp(v, min = 0, max = 255) {
+      return v < min ? min : v > max ? max : v;
+    }
+
+    function hexToRgb(hex) {
+      const clean = hex.replace("#", "");
+      const num = parseInt(clean, 16);
+      return {
+        r: (num >> 16) & 255,
+        g: (num >> 8) & 255,
+        b: num & 255
+      };
+    }
+
+    function rgbToHex(r, g, b) {
+      const toHex = (n) => Math.round(clamp(n)).toString(16).padStart(2, "0");
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
+    }
+
+    function lerpRgb(c1, c2, t) {
+      return {
+        r: lerp(c1.r, c2.r, t),
+        g: lerp(c1.g, c2.g, t),
+        b: lerp(c1.b, c2.b, t)
+      };
+    }
+
+    function rgbToHsl(r, g, b) {
+      r /= 255; g /= 255; b /= 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      const l = (max + min) / 2;
+      let h = 0, s = 0;
+      const d = max - min;
+      if (d !== 0) {
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+        else if (max === g) h = (b - r) / d + 2;
+        else h = (r - g) / d + 4;
+        h *= 60;
+        if (h < 0) h += 360;
+      }
+      return { h, s, l };
+    }
+
+    function hslToRgb(h, s, l) {
+      h = ((h % 360) + 360) % 360;
+      const c = (1 - Math.abs(2 * l - 1)) * s;
+      const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+      const m = l - c / 2;
+      let r = 0, g = 0, b = 0;
+      if (h < 60) { r = c; g = x; b = 0; }
+      else if (h < 120) { r = x; g = c; b = 0; }
+      else if (h < 180) { r = 0; g = c; b = x; }
+      else if (h < 240) { r = 0; g = x; b = c; }
+      else if (h < 300) { r = x; g = 0; b = c; }
+      else { r = c; g = 0; b = x; }
+      return { r: (r + m) * 255, g: (g + m) * 255, b: (b + m) * 255 };
+    }
+
+    // 示範圖 1：立體光影雙球
+    function createDemoSpheres() {
+      const c = document.createElement("canvas");
+      c.width = 640;
+      c.height = 420;
+      const ctx = c.getContext("2d");
+
+      ctx.fillStyle = "#101521";
+      ctx.fillRect(0, 0, c.width, c.height);
+
+      // 地面微光陰影
+      const floorGrad = ctx.createRadialGradient(255, 355, 10, 255, 355, 160);
+      floorGrad.addColorStop(0, "rgba(0,0,0,0.8)");
+      floorGrad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = floorGrad;
+      ctx.fillRect(60, 280, 400, 120);
+
+      const cx = 240, cy = 205, radius = 138;
+      const grad = ctx.createRadialGradient(cx - radius * 0.38, cy - radius * 0.38, radius * 0.06, cx, cy, radius);
+      grad.addColorStop(0, "#fff8db");
+      grad.addColorStop(0.32, "#ff9f1c");
+      grad.addColorStop(0.76, "#3a0ca3");
+      grad.addColorStop(1, "#0b091a");
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      const sx = 470, sy = 250, sr = 76;
+      const sGrad = ctx.createRadialGradient(sx - sr * 0.35, sy - sr * 0.35, sr * 0.05, sx, sy, sr);
+      sGrad.addColorStop(0, "#e0fbfc");
+      sGrad.addColorStop(0.45, "#00b4d8");
+      sGrad.addColorStop(1, "#03045e");
+      ctx.beginPath();
+      ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+      ctx.fillStyle = sGrad;
+      ctx.fill();
+
+      const img = new Image();
+      img.onload = () => { setCurrentImage(img); renderCurrentMode(); };
+      img.src = c.toDataURL();
+    }
+
+    // 示範圖 2：立體環面 (Torus Shading)
+    function createDemoTorus() {
+      const c = document.createElement("canvas");
+      c.width = 640;
+      c.height = 420;
+      const ctx = c.getContext("2d");
+      const imgData = ctx.createImageData(c.width, c.height);
+      const data = imgData.data;
+
+      const R = 115, r = 48;
+      const lx = -0.55, ly = -0.62, lz = 0.56;
+      const lLen = Math.hypot(lx, ly, lz);
+      const L = [lx / lLen, ly / lLen, lz / lLen];
+
+      for (let py = 0; py < c.height; py++) {
+        for (let px = 0; px < c.width; px++) {
+          const idx = (py * c.width + px) * 4;
+          const x = px - c.width / 2;
+          const y = (py - c.height / 2) * 1.15;
+          const d = Math.hypot(x, y);
+          const distToRing = Math.abs(d - R);
+
+          if (distToRing <= r) {
+            const z = Math.sqrt(Math.max(0, r * r - distToRing * distToRing));
+            const phi = Math.atan2(y, x);
+            const nx = ((d - R) * Math.cos(phi)) / r;
+            const ny = ((d - R) * Math.sin(phi)) / r;
+            const nz = z / r;
+            const diff = Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]);
+            const spec = Math.pow(Math.max(0, nz * 0.7 + diff * 0.5), 18);
+            const val = Math.min(1, 0.1 + diff * 0.75 + spec * 0.55);
+            data[idx] = Math.round(lerp(24, 255, val));
+            data[idx + 1] = Math.round(lerp(28, 215, Math.pow(val, 1.1)));
+            data[idx + 2] = Math.round(lerp(88, 120, Math.pow(val, 1.4)));
+          } else {
+            data[idx] = 14;
+            data[idx + 1] = 18;
+            data[idx + 2] = 28;
+          }
+          data[idx + 3] = 255;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+      const img = new Image();
+      img.onload = () => { setCurrentImage(img); renderCurrentMode(); };
+      img.src = c.toDataURL();
+    }
+
+    function parseCustomBgColor() {
+      const fmt = els.customBgFormat ? els.customBgFormat.value : "rgb";
+      const raw = (els.customBgInput ? els.customBgInput.value : "").trim();
+      const clamp255 = (v) => Math.max(0, Math.min(255, Math.round(v)));
+      const clamp100 = (v) => Math.max(0, Math.min(100, v));
+
+      if (fmt === "rgb") {
+        // 支援 #RRGGBB 或 #RGB
+        const hexMatch = raw.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+        if (hexMatch) {
+          let h = hexMatch[1];
+          if (h.length === 3) h = h.split("").map((ch) => ch + ch).join("");
+          const num = parseInt(h, 16);
+          return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255, valid: true };
+        }
+        // 支援 "R, G, B" / "rgb(R, G, B)" / 空白分隔
+        const nums = raw.replace(/^rgb\s*\(|\)$/gi, "").split(/[\s,;/]+/).filter(Boolean).map(Number);
+        if (nums.length >= 3 && nums.slice(0, 3).every((n) => Number.isFinite(n))) {
+          return { r: clamp255(nums[0]), g: clamp255(nums[1]), b: clamp255(nums[2]), valid: true };
+        }
+        return { r: 10, g: 13, b: 18, valid: false };
+      }
+
+      // CMYK (0–100%)
+      const cmykNums = raw.replace(/^cmyk\s*\(|\)$/gi, "").replace(/%/g, "").split(/[\s,;/]+/).filter(Boolean).map(Number);
+      if (cmykNums.length >= 4 && cmykNums.slice(0, 4).every((n) => Number.isFinite(n))) {
+        const c = clamp100(cmykNums[0]) / 100;
+        const m = clamp100(cmykNums[1]) / 100;
+        const y = clamp100(cmykNums[2]) / 100;
+        const k = clamp100(cmykNums[3]) / 100;
+        return {
+          r: clamp255(255 * (1 - c) * (1 - k)),
+          g: clamp255(255 * (1 - m) * (1 - k)),
+          b: clamp255(255 * (1 - y) * (1 - k)),
+          valid: true
+        };
+      }
+      return { r: 10, g: 13, b: 18, valid: false };
+    }
+
+    function rgbToCmyk(r, g, b) {
+      const rn = r / 255, gn = g / 255, bn = b / 255;
+      const k = 1 - Math.max(rn, gn, bn);
+      if (k >= 1 - 1e-6) return { c: 0, m: 0, y: 0, k: 100 };
+      const c = ((1 - rn - k) / (1 - k)) * 100;
+      const m = ((1 - gn - k) / (1 - k)) * 100;
+      const y = ((1 - bn - k) / (1 - k)) * 100;
+      return {
+        c: Math.round(c),
+        m: Math.round(m),
+        y: Math.round(y),
+        k: Math.round(k * 100)
+      };
+    }
+
+    function updateCustomBgPreview(parsed) {
+      if (!els.customBgPreview || !els.customBgParsed) return;
+      if (parsed.valid) {
+        const hex = rgbToHex(parsed.r, parsed.g, parsed.b);
+        els.customBgPreview.style.background = hex;
+        els.customBgParsed.textContent = `預覽：${hex} · rgb(${parsed.r}, ${parsed.g}, ${parsed.b})`;
+        els.customBgParsed.style.color = "var(--muted)";
+      } else {
+        els.customBgPreview.style.background = "transparent";
+        els.customBgParsed.textContent = els.customBgFormat.value === "rgb"
+          ? "格式未辨識（請輸入 R,G,B 或 #Hex）"
+          : "格式未辨識（請輸入 C,M,Y,K 四個 0–100 數值）";
+        els.customBgParsed.style.color = "#f87171";
+      }
+    }
+
+    function getActiveRamp() {
+      // 以 Array.from 依 Unicode 碼位切分，避免自訂 emoji 等代理對字元被拆成亂碼
+      let ramp = Array.from(els.rampPreset.value === "custom" ? els.customRamp.value : els.rampPreset.value);
+      if (ramp.length < 2) ramp = Array.from("@%#*+=-:. ");
+
+      let isLightBg = els.bgMode.value === "light";
+      if (els.bgMode.value === "custom" && !els.transparentBg.checked) {
+        const customBg = parseCustomBgColor();
+        const lum = (0.299 * customBg.r + 0.587 * customBg.g + 0.114 * customBg.b) / 255;
+        isLightBg = lum > 0.6;
+      }
+      let shouldReverse = false;
+      if (els.autoInvertRamp.checked && isLightBg) shouldReverse = !shouldReverse;
+      if (els.manualInvert.checked) shouldReverse = !shouldReverse;
+
+      return shouldReverse ? ramp.reverse() : ramp;
+    }
+
+    function computeComplementaryBg(pixels) {
+      let rSum = 0, gSum = 0, bSum = 0, count = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (pixels[i + 3] < ALPHA_CUTOFF) continue;
+        rSum += pixels[i];
+        gSum += pixels[i + 1];
+        bSum += pixels[i + 2];
+        count++;
+      }
+      if (!count) return { r: 10, g: 13, b: 18 };
+      return {
+        r: (255 - rSum / count) * 0.5,
+        g: (255 - gSum / count) * 0.5,
+        b: (255 - bSum / count) * 0.5
+      };
+    }
+
+    function getBgRgb(pixels) {
+      switch (els.bgMode.value) {
+        case "light": return { r: 247, g: 248, b: 250 };
+        case "navy": return { r: 9, g: 25, b: 51 };
+        case "complementary": return computeComplementaryBg(pixels);
+        case "custom": {
+          const parsed = parseCustomBgColor();
+          updateCustomBgPreview(parsed);
+          return { r: parsed.r, g: parsed.g, b: parsed.b };
+        }
+        case "dark":
+        default: return { r: 10, g: 13, b: 18 };
+      }
+    }
+
+    function applyBlendMode(orig, duo, mode) {
+      if (mode === "screen") {
+        return {
+          r: 255 - ((255 - orig.r) * (255 - duo.r)) / 255,
+          g: 255 - ((255 - orig.g) * (255 - duo.g)) / 255,
+          b: 255 - ((255 - orig.b) * (255 - duo.b)) / 255
+        };
+      }
+      if (mode === "multiply") {
+        return {
+          r: (orig.r * duo.r) / 255,
+          g: (orig.g * duo.g) / 255,
+          b: (orig.b * duo.b) / 255
+        };
+      }
+      if (mode === "overlay") {
+        const ov = (a, b) => (a < 128 ? (2 * a * b) / 255 : 255 - (2 * (255 - a) * (255 - b)) / 255);
+        return { r: ov(orig.r, duo.r), g: ov(orig.g, duo.g), b: ov(orig.b, duo.b) };
+      }
+      return duo;
+    }
+
+    function renderASCII() {
+      if (!currentImg) return;
+
+      let cols = parseInt(els.cols.value, 10);
+      const aspect = parseFloat(els.aspect.value);
+      const contrast = parseFloat(els.contrast.value);
+      const brightness = parseFloat(els.brightness.value);
+      const saturation = parseFloat(els.saturation.value);
+      const hueShift = parseFloat(els.hueShift.value);
+      const colorMix = parseFloat(els.colorMix.value);
+
+      const stackMode = els.stackMode.value;
+      let stackLayers = parseInt(els.stackLayers.value, 10);
+      const stackDepth = parseFloat(els.stackDepth.value);
+      const stackAngle = parseFloat(els.stackAngle.value);
+      const stackFade = parseFloat(els.stackFade.value);
+      const stackScale = els.stackScale.checked;
+
+      const strokeAmt = parseFloat(els.stroke.value);
+      const embossAmt = parseFloat(els.emboss.value);
+      const edgeAmt = parseFloat(els.edge.value);
+      let bloomAmt = parseFloat(els.bloom.value);
+      const scanlineAmt = parseFloat(els.scanlines.value);
+      const halftoneAmt = parseFloat(els.halftone.value);
+      const vignetteAmt = parseFloat(els.vignette.value);
+      const chromaPx = parseFloat(els.chromaticAberration.value);
+      const glitchAmt = parseFloat(els.glitch.value);
+      const ditherAmt = parseFloat(els.dither.value);
+      const posterSteps = parseInt(els.posterize.value, 10);
+
+      // 更新標籤顯示
+      els.colsVal.textContent = cols;
+      els.aspectVal.textContent = aspect.toFixed(2);
+      els.contrastVal.textContent = contrast.toFixed(2);
+      els.brightVal.textContent = brightness.toFixed(2);
+      els.saturationVal.textContent = saturation.toFixed(2);
+      els.hueShiftVal.textContent = `${hueShift}°`;
+      els.colorMixVal.textContent = colorMix.toFixed(2);
+      els.stackLayersVal.textContent = stackLayers;
+      els.stackDepthVal.textContent = `${stackDepth.toFixed(1)} px`;
+      els.stackAngleVal.textContent = `${stackAngle}°`;
+      els.stackFadeVal.textContent = stackFade.toFixed(2);
+      els.strokeVal.textContent = strokeAmt.toFixed(2);
+      els.embossVal.textContent = embossAmt.toFixed(2);
+      els.edgeVal.textContent = edgeAmt.toFixed(2);
+      els.bloomVal.textContent = bloomAmt.toFixed(2);
+      els.scanlinesVal.textContent = scanlineAmt.toFixed(2);
+      els.halftoneVal.textContent = halftoneAmt.toFixed(2);
+      els.vignetteVal.textContent = vignetteAmt.toFixed(2);
+      els.chromaticVal.textContent = `${chromaPx.toFixed(1)} px`;
+      els.glitchVal.textContent = glitchAmt.toFixed(2);
+      els.ditherVal.textContent = ditherAmt.toFixed(2);
+      els.posterVal.textContent = posterSteps;
+
+      const stackLabels = {
+        extrude: `字元堆疊：3D 擠出 ${stackLayers} 層`,
+        parallax: `字元堆疊：視差浮雕 ${stackLayers} 層`,
+        overprint: `字元堆疊：雙層疊印`,
+        off: "字元堆疊：關閉（平面）"
+      };
+      els.stackBadge.textContent = stackLabels[stackMode];
+      els.stackBadge.style.opacity = stackMode === "off" ? "0.55" : "1";
+
+      const crop = getSourceCropRect(currentImg);
+      const imgAspect = crop.sh / crop.sw;
+      const asciiSig = els.asciiSignal ? els.asciiSignal.value : "luma";
+      const fullCols = cols;
+      const fullRows = Math.max(12, Math.round(fullCols * imgAspect * aspect));
+      els.gridBadge.textContent = `${fullCols} × ${fullRows} 字元`;
+
+      // 輸出內容維持原圖比例；長寬比校正只決定行數（列密度），不再把整張圖壓扁／拉長
+      const baseContentW = 960;
+      const exactContentH = baseContentW * imgAspect;
+      const pad = stackMode === "off" ? 0 : Math.ceil(stackDepth + 4);
+      svgWidth = baseContentW + pad * 2;
+      svgHeight = Math.round(exactContentH) + pad * 2;
+      vbW = svgWidth;
+      vbH = svgHeight;
+      contentRect = { x: pad, y: pad, w: baseContentW, h: exactContentH };
+
+      let rows = fullRows;
+      if (isInteractiveDrag) {
+        const isSlidingCols = activeSlideEl === els.cols;
+        const dragColCap = isSlidingCols ? 260 : 108;
+        if (cols > dragColCap) {
+          cols = dragColCap;
+          rows = Math.max(12, Math.round(cols * imgAspect * aspect));
+        }
+        if (isSlidingCols) {
+          stackLayers = 1;
+        } else if (stackLayers > 2) {
+          stackLayers = 2;
+        }
+        bloomAmt = 0;
+      }
+
+      const cellW = baseContentW / (cols + 0.6);
+      const cellH = exactContentH / rows;
+      // 字級同時受格寬與格高限制，行數高時不會上下重疊
+      const charSize = Math.min(cellW / 0.64, cellH / 1.06);
+      // 基線：字元垂直置中於格內
+      const baselineOff = cellH * 0.5 + charSize * 0.36;
+
+      const pixels = getSourcePixels(crop, cols, rows);
+      const isTransparentBg = els.transparentBg && els.transparentBg.checked;
+      const bgRgb = getBgRgb(pixels);
+      const bgHex = rgbToHex(bgRgb.r, bgRgb.g, bgRgb.b);
+
+      if (els.canvasFrame) {
+        els.canvasFrame.classList.toggle("transparent-preview", isTransparentBg);
+      }
+
+      if (isTransparentBg) {
+        els.bgHexLabel.textContent = "透明 (去背 PNG)";
+        els.bgSwatch.style.background = "repeating-conic-gradient(#a8a8a8 0% 25%, #8f8f8f 0% 50%) 50% / 8px 8px";
+      } else {
+        els.bgHexLabel.textContent = bgHex;
+        els.bgSwatch.style.background = bgHex;
+      }
+
+      const ramp = getActiveRamp();
+      // 去背模式 + 去背 PNG：形狀由 alpha 決定，主體每格都要有字元（黑色區域也照樣運算輸出），
+      // 透明區留空 → 背景透明。字元集中的空白不再用於主體。
+      const alphaShapeMode = isTransparentBg && pixelCache.hasAlpha;
+      let useRamp = ramp;
+      if (alphaShapeMode) {
+        const inkOnly = ramp.filter((c) => c.trim() !== "");
+        if (inkOnly.length) useRamp = inkOnly;
+      }
+
+      // 自動對比掃描（略過透明像素）
+      let autoMin = 1, autoMax = 0;
+      if (els.autoContrast.checked) {
+        for (let i = 0; i < pixels.length; i += 4) {
+          if (pixels[i + 3] < ALPHA_CUTOFF) continue;
+          const lum = getSignalValue(pixels[i], pixels[i + 1], pixels[i + 2], asciiSig);
+          if (lum < autoMin) autoMin = lum;
+          if (lum > autoMax) autoMax = lum;
+        }
+      }
+      const autoRange = Math.max(autoMax - autoMin, 0.01);
+
+      const hiRgb = hexToRgb(els.highlightColor.value);
+      const shRgb = hexToRgb(els.shadowColor.value);
+      const isDuotone = els.colorMode.value === "duotone";
+      const isBrick = els.layoutMode.value === "brick";
+      const blendMode = els.blendMode.value;
+
+      els.highlightColor.disabled = !isDuotone;
+      els.shadowColor.disabled = !isDuotone;
+      els.duotonePreset.disabled = !isDuotone;
+      els.colorMix.disabled = !isDuotone;
+      els.blendMode.disabled = !isDuotone;
+
+      // 預先計算每個格子的字元、顏色與亮度 (供堆疊與純文字輸出)
+      const grid = new Array(rows);
+      const textLines = [];
+      const breathBoost = els.animate.checked ? Math.sin(animPhase) * 0.12 : 0;
+
+      let asciiInkSum = 0;
+      for (let y = 0; y < rows; y++) {
+        grid[y] = new Array(cols);
+        let rowStr = "";
+        for (let x = 0; x < cols; x++) {
+          const i = (y * cols + x) * 4;
+          let r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+
+          // 透明像素 → 空白（舊版會被當成 rgb(0,0,0) 黑色處理）
+          if (pixels[i + 3] < ALPHA_CUTOFF) {
+            grid[y][x] = { ch: " ", lum: 0, r: 0, g: 0, b: 0 };
+            rowStr += " ";
+            continue;
+          }
+
+          if (els.colorInvert.checked) {
+            r = 255 - r; g = 255 - g; b = 255 - b;
+          }
+
+          let lum = getSignalValue(r, g, b, asciiSig);
+
+          if (els.autoContrast.checked) {
+            lum = clamp((lum - autoMin) / autoRange, 0, 1);
+          }
+
+          // 亮度與對比
+          lum = clamp((lum * brightness - 0.5) * contrast + 0.5 + breathBoost, 0, 1);
+
+          // 邊緣強調 & 3D 壓紋浮雕
+          if (edgeAmt > 0 || embossAmt > 0) {
+            const xPrev = Math.max(0, x - 1), yPrev = Math.max(0, y - 1);
+            const iL = (y * cols + xPrev) * 4;
+            const iU = (yPrev * cols + x) * 4;
+            const iUL = (yPrev * cols + xPrev) * 4;
+            const lumL = getSignalValue(pixels[iL], pixels[iL + 1], pixels[iL + 2], asciiSig);
+            const lumU = getSignalValue(pixels[iU], pixels[iU + 1], pixels[iU + 2], asciiSig);
+            const lumUL = getSignalValue(pixels[iUL], pixels[iUL + 1], pixels[iUL + 2], asciiSig);
+            if (edgeAmt > 0) {
+              const diff = Math.abs(lum - lumL) + Math.abs(lum - lumU);
+              lum = clamp(lum + diff * edgeAmt * 1.4, 0, 1);
+            }
+            if (embossAmt > 0) {
+              lum = clamp(lum + (lum - lumUL) * embossAmt * 2.2, 0, 1);
+            }
+          }
+
+          // 順序抖動與色階化
+          if (ditherAmt > 0) {
+            const bVal = BAYER_4X4[y % 4][x % 4] / 16 - 0.5;
+            lum = clamp(lum + bVal * ditherAmt * 0.45, 0, 1);
+          }
+          if (posterSteps > 0) {
+            const levels = Math.max(2, posterSteps);
+            lum = Math.round(lum * (levels - 1)) / (levels - 1);
+          }
+
+          // 去背主體模式：設密度下限，黑色區域也輸出看得見的實心字元，而不是退化成「.」
+          const charLum = alphaShapeMode ? 0.3 + lum * 0.7 : lum;
+          const charIdx = Math.min(useRamp.length - 1, Math.max(0, Math.floor((1 - charLum) * (useRamp.length - 1))));
+          const ch = useRamp[charIdx];
+          if (ch !== " ") {
+            asciiInkSum += 1 - (charIdx / Math.max(1, useRamp.length - 1)) * 0.72;
+          }
+          rowStr += ch;
+
+          // 色彩計算
+          let finalRgb = { r, g, b };
+          if (isDuotone) {
+            const duo = lerpRgb(shRgb, hiRgb, lum);
+            const blended = applyBlendMode(finalRgb, duo, blendMode);
+            finalRgb = lerpRgb(finalRgb, blended, colorMix);
+          } else {
+            const shade = 0.25 + lum * 0.95;
+            finalRgb = { r: r * shade, g: g * shade, b: b * shade };
+          }
+
+          // 飽和度 & 色相偏移
+          if (saturation !== 1 || hueShift !== 0) {
+            const hsl = rgbToHsl(finalRgb.r, finalRgb.g, finalRgb.b);
+            hsl.h = (hsl.h + hueShift + 360) % 360;
+            hsl.s = Math.min(1, Math.max(0, hsl.s * saturation));
+            finalRgb = hslToRgb(hsl.h, hsl.s, hsl.l);
+          }
+
+          grid[y][x] = {
+            ch,
+            lum,
+            r: clamp(finalRgb.r),
+            g: clamp(finalRgb.g),
+            b: clamp(finalRgb.b)
+          };
+        }
+        textLines.push(rowStr);
+      }
+      lastAsciiText = textLines.join("\n");
+      if (els.inkBadge) {
+        const cov = (asciiInkSum / Math.max(1, cols * rows)) * 100;
+        els.inkBadge.textContent = `覆蓋率 ${cov.toFixed(1)}%`;
+      }
+
+      // 光源/擠出方向向量 (角度轉弧度)
+      const rad = (stackAngle * Math.PI) / 180;
+      const dirX = Math.cos(rad);
+      const dirY = Math.sin(rad);
+
+      // 預先計算 Glitch 行偏移（固定種子：拖滑桿／匯出時不會每次亂跳）
+      const rowShiftX = new Float32Array(rows);
+      if (glitchAmt > 0) {
+        const rand = mulberry32(0x9e3779b9 ^ rows);
+        for (let y = 0; y < rows; y++) {
+          const roll = rand();
+          const amp = rand();
+          if (roll < glitchAmt * 0.22) {
+            rowShiftX[y] = (amp - 0.5) * glitchAmt * 26;
+          }
+        }
+      }
+
+      // ===== 效能核心：只產生「場景資料」，預覽以 Canvas 繪製；SVG 只在匯出時才組字串。
+      // 同一層中「同色 × 同透明度 × 同縮放」的字元合併為一個 bucket。=====
+      const sceneLayers = [];
+      const newLayer = () => new Map();
+      const addGlyph = (layer, px, py, ch, fill, alpha = 1, scale = 1) => {
+        if (ch === " ") return;
+        const sc = scale !== 1 ? Math.round(scale * 50) / 50 : 1;
+        const al = alpha < 0.99 ? Math.round(alpha * 100) / 100 : 1;
+        const key = `${fill}|${al}|${sc}`;
+        let b = layer.get(key);
+        if (!b) {
+          b = { fill, al, sc, xs: [], ys: [], chars: [] };
+          layer.set(key, b);
+        }
+        let gx = px;
+        let gy = py + baselineOff;
+        if (sc !== 1) {
+          // 等效於原本的 translate(cx cy) scale(sc) translate(-cx -cy)
+          const cx = px + cellW * 0.5;
+          const cy = py + cellH * 0.5;
+          gx = cx + (gx - cx) * sc;
+          gy = cy + (gy - cy) * sc;
+        }
+        b.xs.push(gx);
+        b.ys.push(gy);
+        b.chars.push(ch);
+      };
+      // 色差副本放在獨立子層、先畫在底下，避免合併 bucket 後蓋到鄰格主字元
+      const flushLayer = (under, main) => {
+        if (under.size) sceneLayers.push(Array.from(under.values()));
+        sceneLayers.push(Array.from(main.values()));
+      };
+      const chromaR = (cell) => quantHex(cell.r, 0, 0);
+      const chromaB = (cell) => quantHex(0, 120, cell.b);
+
+      // ===== 渲染管線：支援「字元堆疊 3D」分層由底到頂產生 SVG 向量文字 =====
+      if (stackMode === "off") {
+        const layer = newLayer();
+          const chromaLayer = newLayer();
+        for (let y = 0; y < rows; y++) {
+          const brickX = isBrick && y % 2 === 1 ? cellW * 0.5 : 0;
+          const py = pad + y * cellH;
+          for (let x = 0; x < cols; x++) {
+            const cell = grid[y][x];
+            if (cell.ch === " ") continue;
+            const px = pad + x * cellW + brickX + rowShiftX[y];
+            if (chromaPx > 0) {
+              addGlyph(chromaLayer, px - chromaPx, py, cell.ch, chromaR(cell), 0.75);
+              addGlyph(chromaLayer, px + chromaPx, py, cell.ch, chromaB(cell), 0.75);
+            }
+            addGlyph(layer, px, py, cell.ch, quantHex(cell.r, cell.g, cell.b), 1);
+          }
+        }
+        flushLayer(chromaLayer, layer);
+      } else if (stackMode === "overprint") {
+        const underChars = ["@", "#", "%", "▓", "▒"];
+        for (let pass = 0; pass < 2; pass++) {
+          const layer = newLayer();
+          const chromaLayer = newLayer();
+          for (let y = 0; y < rows; y++) {
+            const brickX = isBrick && y % 2 === 1 ? cellW * 0.5 : 0;
+            const py = pad + y * cellH;
+            for (let x = 0; x < cols; x++) {
+              const cell = grid[y][x];
+              if (cell.ch === " ") continue;
+              const px = pad + x * cellW + brickX + rowShiftX[y];
+              if (pass === 0) {
+                const uCh = underChars[Math.min(underChars.length - 1, Math.floor((1 - cell.lum) * underChars.length))];
+                const ox = dirX * stackDepth * (0.4 + cell.lum * 0.6);
+                const oy = dirY * stackDepth * (0.4 + cell.lum * 0.6);
+                const darkR = cell.r * (1 - stackFade * 0.65);
+                const darkG = cell.g * (1 - stackFade * 0.65);
+                const darkB = cell.b * (1 - stackFade * 0.55);
+                addGlyph(layer, px + ox, py + oy, uCh, quantHex(darkR, darkG, darkB), 1 - stackFade * 0.35);
+              } else {
+                const sc = stackScale ? 1 + cell.lum * 0.14 : 1;
+                if (chromaPx > 0) {
+                  addGlyph(chromaLayer, px - chromaPx, py, cell.ch, chromaR(cell), 0.65, sc);
+                  addGlyph(chromaLayer, px + chromaPx, py, cell.ch, chromaB(cell), 0.65, sc);
+                }
+                addGlyph(layer, px, py, cell.ch, quantHex(cell.r, cell.g, cell.b), 1, sc);
+              }
+            }
+          }
+          flushLayer(chromaLayer, layer);
+        }
+      } else {
+        for (let li = 0; li < stackLayers; li++) {
+          const t = stackLayers === 1 ? 1 : li / (stackLayers - 1);
+          const isTop = li === stackLayers - 1;
+          const layer = newLayer();
+          const chromaLayer = newLayer();
+          const shadeFactor = lerp(1 - stackFade * 0.78, 1, t);
+          const mixT = t * 0.85 + 0.15;
+          const alpha = isTop ? 1 : lerp(0.32, 0.88, t);
+
+          for (let y = 0; y < rows; y++) {
+            const brickX = isBrick && y % 2 === 1 ? cellW * 0.5 : 0;
+            const pyBase = pad + y * cellH;
+            for (let x = 0; x < cols; x++) {
+              const cell = grid[y][x];
+              if (cell.ch === " ") continue;
+              const pxBase = pad + x * cellW + brickX + rowShiftX[y];
+
+              let ox = 0, oy = 0;
+              if (stackMode === "extrude") {
+                const dist = (1 - t) * stackDepth * (0.35 + cell.lum * 0.65);
+                ox = dirX * dist;
+                oy = dirY * dist;
+              } else {
+                const lift = t * stackDepth * (cell.lum * 1.15);
+                ox = -dirX * lift;
+                oy = -dirY * lift;
+              }
+
+              const px = pxBase + ox;
+              const py = pyBase + oy;
+              const lr = lerp(shRgb.r * 0.55, cell.r, mixT) * shadeFactor;
+              const lg = lerp(shRgb.g * 0.55, cell.g, mixT) * shadeFactor;
+              const lb = lerp(shRgb.b * 0.65, cell.b, mixT) * shadeFactor;
+              const sc = isTop && stackScale ? 1 + cell.lum * 0.16 : 1;
+
+              if (isTop && chromaPx > 0) {
+                addGlyph(chromaLayer, px - chromaPx, py, cell.ch, chromaR(cell), 0.65, sc);
+                addGlyph(chromaLayer, px + chromaPx, py, cell.ch, chromaB(cell), 0.65, sc);
+              }
+              addGlyph(layer, px, py, cell.ch, quantHex(lr, lg, lb), alpha, sc);
+            }
+          }
+          flushLayer(chromaLayer, layer);
+        }
+      }
+
+      asciiScene = {
+        w: svgWidth,
+        h: svgHeight,
+        bgHex: isTransparentBg ? null : bgHex,
+        charSize,
+        strokeW: strokeAmt > 0 ? strokeAmt * 2.2 : 0,
+        bloom: bloomAmt,
+        scanline: scanlineAmt,
+        halftone: halftoneAmt,
+        vignette: isTransparentBg ? 0 : vignetteAmt,
+        layers: sceneLayers
+      };
+      asciiSvgDirty = true;
+      drawAsciiPreview();
+    }
+
+    const STACK_FONT = '"Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, monospace';
+
+    // ===== ASCII 場景：Canvas 預覽／放大鏡／PNG 匯出 共用同一份資料 =====
+    let asciiScene = null;
+    let asciiSvgDirty = true;
+    let bloomScratch = null;
+    const htPatternCache = { key: "", canvas: null };
+    const CTX_FILTER_OK = (() => {
+      try { return typeof document.createElement("canvas").getContext("2d").filter === "string"; } catch { return false; }
+    })();
+
+    function drawAsciiGlyphs(ctx, sc, region) {
+      const sw = sc.strokeW;
+      if (sw > 0) {
+        ctx.lineWidth = sw;
+        ctx.strokeStyle = "rgba(0,0,0,0.85)";
+        ctx.lineJoin = "round";
+      }
+      ctx.textBaseline = "alphabetic";
+      ctx.textAlign = "left";
+      const m = sc.charSize * 1.4;
+      for (const layer of sc.layers) {
+        for (const b of layer) {
+          ctx.font = `700 ${(sc.charSize * b.sc).toFixed(2)}px ${STACK_FONT}`;
+          ctx.fillStyle = b.fill;
+          const xs = b.xs, ys = b.ys, chs = b.chars, n = xs.length;
+          if (sw > 0) {
+            for (let i = 0; i < n; i++) {
+              const x = xs[i], y = ys[i];
+              if (region && (x < region.x0 - m || x > region.x1 + m || y < region.y0 - m || y > region.y1 + m)) continue;
+              ctx.globalAlpha = 1;
+              ctx.strokeText(chs[i], x, y);
+              ctx.globalAlpha = b.al;
+              ctx.fillText(chs[i], x, y);
+            }
+          } else {
+            ctx.globalAlpha = b.al;
+            for (let i = 0; i < n; i++) {
+              const x = xs[i], y = ys[i];
+              if (region && (x < region.x0 - m || x > region.x1 + m || y < region.y0 - m || y > region.y1 + m)) continue;
+              ctx.fillText(chs[i], x, y);
+            }
+          }
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawAsciiOverlays(ctx, sc, region) {
+      const x0 = region ? Math.max(0, region.x0) : 0;
+      const y0 = region ? Math.max(0, region.y0) : 0;
+      const x1 = region ? Math.min(sc.w, region.x1) : sc.w;
+      const y1 = region ? Math.min(sc.h, region.y1) : sc.h;
+      if (sc.scanline > 0) {
+        ctx.fillStyle = `rgba(0,0,0,${(sc.scanline * 0.55).toFixed(2)})`;
+        for (let y = Math.floor(y0 / 3) * 3; y < y1; y += 3) ctx.fillRect(x0, y, x1 - x0, 1);
+      }
+      if (sc.halftone > 0) {
+        const k = Math.max(1, ctx.getTransform().a);
+        const key = `${sc.halftone}|${k.toFixed(3)}`;
+        if (htPatternCache.key !== key) {
+          const pc = document.createElement("canvas");
+          pc.width = pc.height = Math.max(1, Math.round(6 * k));
+          const px = pc.getContext("2d");
+          px.scale(pc.width / 6, pc.height / 6);
+          px.fillStyle = `rgba(0,0,0,${(sc.halftone * 0.45).toFixed(2)})`;
+          px.beginPath();
+          px.arc(3, 3, sc.halftone * 1.6, 0, Math.PI * 2);
+          px.fill();
+          htPatternCache.key = key;
+          htPatternCache.canvas = pc;
+        }
+        const pat = ctx.createPattern(htPatternCache.canvas, "repeat");
+        if (pat.setTransform) pat.setTransform(new DOMMatrix([6 / htPatternCache.canvas.width, 0, 0, 6 / htPatternCache.canvas.height, 0, 0]));
+        ctx.fillStyle = pat;
+        ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      }
+      if (sc.vignette > 0) {
+        // 對應 SVG objectBoundingBox 的橢圓漸層
+        ctx.save();
+        ctx.translate(sc.w * 0.5, sc.h * 0.5);
+        ctx.scale(sc.w, sc.h);
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 0.65);
+        g.addColorStop(0.35, "rgba(0,0,0,0)");
+        g.addColorStop(1, `rgba(0,0,0,${(sc.vignette * 0.82).toFixed(2)})`);
+        ctx.fillStyle = g;
+        ctx.fillRect(-0.5, -0.5, 1, 1);
+        ctx.restore();
+      }
+    }
+
+    // ctx 需先設好「場景單位 → 裝置像素」的 transform
+    function drawAsciiScene(ctx, sc, region = null, allowBloom = true) {
+      if (sc.bgHex) {
+        ctx.fillStyle = sc.bgHex;
+        if (region) ctx.fillRect(region.x0, region.y0, region.x1 - region.x0, region.y1 - region.y0);
+        else ctx.fillRect(0, 0, sc.w, sc.h);
+      }
+      if (allowBloom && sc.bloom > 0 && CTX_FILTER_OK) {
+        // 真正的 Bloom：字元層模糊後墊在底下（舊版 drop-shadow 套在含不透明底色的整張 SVG 上，只會在外框產生陰影）
+        const cw = ctx.canvas.width, ch = ctx.canvas.height;
+        if (!bloomScratch) bloomScratch = document.createElement("canvas");
+        if (bloomScratch.width !== cw || bloomScratch.height !== ch) {
+          bloomScratch.width = cw;
+          bloomScratch.height = ch;
+        }
+        const lctx = bloomScratch.getContext("2d");
+        lctx.setTransform(1, 0, 0, 1, 0, 0);
+        lctx.clearRect(0, 0, cw, ch);
+        lctx.setTransform(ctx.getTransform());
+        drawAsciiGlyphs(lctx, sc, region);
+        const k = ctx.getTransform().a;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.filter = `blur(${(sc.bloom * 4.5 * k).toFixed(1)}px)`;
+        ctx.globalAlpha = Math.min(1, 0.45 + sc.bloom * 0.35);
+        ctx.drawImage(bloomScratch, 0, 0);
+        ctx.filter = "none";
+        ctx.globalAlpha = 1;
+        ctx.drawImage(bloomScratch, 0, 0);
+        ctx.restore();
+      } else {
+        drawAsciiGlyphs(ctx, sc, region);
+      }
+      drawAsciiOverlays(ctx, sc, region);
+    }
+
+    function displayEl() {
+      return appMode === "ascii" ? els.asciiCanvas : els.outputSvg;
+    }
+
+    function applyDisplayMode() {
+      const isAscii = appMode === "ascii";
+      els.asciiCanvas.style.display = isAscii ? "block" : "none";
+      els.outputSvg.style.display = isAscii ? "none" : "block";
+      if (!isAscii) applyFitToSvg();
+    }
+
+    // 「適應視窗」以實際可用的畫布區尺寸計算（原本寫死 100vh - 130px，在手機上下分割版面會超出畫布區）
+    function stageFitBox() {
+      const stage = document.querySelector(".stage"), frame = els.canvasFrame;
+      const ss = getComputedStyle(stage), fs = getComputedStyle(frame);
+      const px = (v) => parseFloat(v) || 0;
+      const w = stage.clientWidth - px(ss.paddingLeft) - px(ss.paddingRight) - px(fs.paddingLeft) - px(fs.paddingRight) - px(fs.borderLeftWidth) - px(fs.borderRightWidth);
+      const h = stage.clientHeight - px(ss.paddingTop) - px(ss.paddingBottom) - px(fs.paddingTop) - px(fs.paddingBottom) - px(fs.borderTopWidth) - px(fs.borderBottomWidth);
+      return { w: Math.max(40, w), h: Math.max(40, h) };
+    }
+    function applyFitToSvg() {
+      const svg = els.outputSvg;
+      if (svg.classList.contains("fit-mode")) {
+        const box = stageFitBox();
+        svg.style.maxWidth = `${Math.floor(box.w)}px`;
+        svg.style.maxHeight = `${Math.floor(box.h)}px`;
+      } else { svg.style.maxWidth = ""; svg.style.maxHeight = ""; }
+    }
+    function applyAsciiCanvasSizing() {
+      const c = els.asciiCanvas;
+      const fit = els.outputSvg.classList.contains("fit-mode");
+      applyFitToSvg();
+      if (fit) {
+        const box = stageFitBox();
+        c.style.width = "auto";
+        c.style.height = "auto";
+        c.style.maxWidth = `${Math.floor(Math.min(box.w, svgWidth))}px`;
+        c.style.maxHeight = `${Math.floor(Math.min(box.h, svgHeight))}px`;
+      } else {
+        c.style.width = `${svgWidth}px`;
+        c.style.height = `${svgHeight}px`;
+        c.style.maxWidth = "none";
+        c.style.maxHeight = "none";
+      }
+    }
+
+    function drawAsciiPreview() {
+      if (!asciiScene) return;
+      applyDisplayMode();
+      const c = els.asciiCanvas;
+      // 拖曳中用 1× 解析度，放開後依螢幕 DPR（上限 2×）重繪
+      const dpr = isInteractiveDrag ? 1 : Math.min(2, window.devicePixelRatio || 1);
+      const bw = Math.round(asciiScene.w * dpr);
+      const bh = Math.round(asciiScene.h * dpr);
+      if (c.width !== bw || c.height !== bh) {
+        c.width = bw;
+        c.height = bh;
+      }
+      applyAsciiCanvasSizing();
+      const ctx = c.getContext("2d");
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, bw, bh);
+      ctx.setTransform(bw / asciiScene.w, 0, 0, bh / asciiScene.h, 0, 0);
+      drawAsciiScene(ctx, asciiScene);
+      // 放大鏡停在畫面上時同步刷新
+      if (els.magnifierToggle.checked && magLastEvent && !magRaf) magRaf = requestAnimationFrame(flushMagnifierMove);
+    }
+
+    // 匯出 SVG 時才把場景資料組成向量字串
+    function buildAsciiSvgMarkup(sc) {
+      const defs = [];
+      if (sc.scanline > 0) {
+        defs.push(`<pattern id="asciiScanPat" width="4" height="3" patternUnits="userSpaceOnUse"><rect width="4" height="1" fill="rgba(0,0,0,${(sc.scanline * 0.55).toFixed(2)})"/></pattern>`);
+      }
+      if (sc.halftone > 0) {
+        defs.push(`<pattern id="asciiHtPat" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="${(sc.halftone * 1.6).toFixed(2)}" fill="rgba(0,0,0,${(sc.halftone * 0.45).toFixed(2)})"/></pattern>`);
+      }
+      if (sc.vignette > 0) {
+        defs.push(`<radialGradient id="asciiVigGrad" cx="50%" cy="50%" r="65%"><stop offset="35%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity="${(sc.vignette * 0.82).toFixed(2)}"/></radialGradient>`);
+      }
+      if (sc.bloom > 0) {
+        const sd = (sc.bloom * 4.5 * 0.5).toFixed(2);
+        const slope = Math.min(1, 0.45 + sc.bloom * 0.35).toFixed(2);
+        defs.push(`<filter id="asciiBloom" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur in="SourceGraphic" stdDeviation="${sd}" result="b"/><feComponentTransfer in="b" result="b2"><feFuncA type="linear" slope="${slope}"/></feComponentTransfer><feMerge><feMergeNode in="b2"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`);
+      }
+      const parts = [];
+      if (defs.length) parts.push(`<defs>${defs.join("")}</defs>`);
+      parts.push(`<g id="svgSceneRoot">`);
+      if (sc.bgHex) parts.push(`<rect x="0" y="0" width="${sc.w}" height="${sc.h}" fill="${sc.bgHex}"/>`);
+      const strokeAttr = sc.strokeW > 0 ? ` stroke="rgba(0,0,0,0.85)" stroke-width="${sc.strokeW.toFixed(2)}" stroke-linejoin="round" paint-order="stroke"` : "";
+      const bloomAttr = sc.bloom > 0 ? ` filter="url(#asciiBloom)"` : "";
+      parts.push(`<g font-family="${escapeXml(STACK_FONT)}" font-size="${sc.charSize.toFixed(2)}" font-weight="700" style="font-variant-ligatures: none;"${strokeAttr}${bloomAttr}>`);
+      for (const layer of sc.layers) {
+        const out = [];
+        for (const b of layer) {
+          const op = b.al < 1 ? ` fill-opacity="${b.al}"` : "";
+          const fs = b.sc !== 1 ? ` font-size="${(sc.charSize * b.sc).toFixed(2)}"` : "";
+          const xs = b.xs.map((v) => v.toFixed(1)).join(" ");
+          const ys = b.ys.map((v) => v.toFixed(1)).join(" ");
+          out.push(`<text x="${xs}" y="${ys}" fill="${b.fill}"${op}${fs}>${escapeXml(b.chars.join(""))}</text>`);
+        }
+        parts.push(`<g>${out.join("")}</g>`);
+      }
+      parts.push(`</g>`);
+      if (sc.scanline > 0) parts.push(`<rect x="0" y="0" width="${sc.w}" height="${sc.h}" fill="url(#asciiScanPat)"/>`);
+      if (sc.halftone > 0) parts.push(`<rect x="0" y="0" width="${sc.w}" height="${sc.h}" fill="url(#asciiHtPat)"/>`);
+      if (sc.vignette > 0) parts.push(`<rect x="0" y="0" width="${sc.w}" height="${sc.h}" fill="url(#asciiVigGrad)"/>`);
+      parts.push(`</g>`);
+      return parts.join("");
+    }
+
+    // 確保 outputSvg 內容是目前模式的最新結果（ASCII 模式下為延遲建構）
+    function ensureOutputSvg() {
+      if (appMode !== "ascii" || !asciiScene) return;
+      if (!asciiSvgDirty) return;
+      const svg = els.outputSvg;
+      svg.setAttribute("viewBox", `0 0 ${asciiScene.w} ${asciiScene.h}`);
+      svg.setAttribute("width", asciiScene.w);
+      svg.setAttribute("height", asciiScene.h);
+      svg.innerHTML = buildAsciiSvgMarkup(asciiScene);
+      svg.style.filter = "";
+      asciiSvgDirty = false;
+    }
+
+    // ASCII 放大鏡：直接以向量資料重繪鏡頭範圍內的字元（清晰且只畫可見的少量字元）
+    function drawAsciiLens(sx, sy, sw, sh) {
+      const c = els.magnifierCanvas;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const size = Math.round(176 * dpr);
+      if (c.width !== size || c.height !== size) {
+        c.width = size;
+        c.height = size;
+      }
+      const ctx = c.getContext("2d");
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, size, size);
+      if (!asciiScene) return;
+      const k = size / sw;
+      ctx.setTransform(k, 0, 0, size / sh, -sx * k, -sy * (size / sh));
+      const region = { x0: sx, y0: sy, x1: sx + sw, y1: sy + sh };
+      drawAsciiScene(ctx, asciiScene, region, false);
+      if (els.compareToggle.checked && currentImg) {
+        const splitX = (compareSplitPct / 100) * vbW;
+        if (splitX > sx) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, 0, splitX, vbH);
+          ctx.clip();
+          if (asciiScene.bgHex) {
+            ctx.fillStyle = asciiScene.bgHex;
+            ctx.fillRect(sx, sy, Math.min(sw, splitX - sx), sh);
+          }
+          ctx.drawImage(els.origCompareCanvas, 0, 0, vbW, vbH);
+          ctx.restore();
+        }
+        ctx.strokeStyle = "#ff4d00";
+        ctx.lineWidth = 2 / k;
+        ctx.beginPath();
+        ctx.moveTo(splitX, sy);
+        ctx.lineTo(splitX, sy + sh);
+        ctx.stroke();
+      }
+    }
+
+    // 動畫迴圈：呼吸燈與色相循環共用單一迴圈，限制 ~20 fps 並以實際經過時間推進，
+    // 避免每一幀都整張重建 SVG 造成主執行緒塞死（原本 60 fps 全量重繪）。
+    const FX_FRAME_MS = 50;
+    let fxLast = 0;
+    function startFxLoop() {
+      if (animRaf) return;
+      fxLast = 0;
+      const tick = (now) => {
+        const anim = els.animate.checked;
+        const cyc = els.duotoneCycle.checked;
+        if ((!anim && !cyc) || appMode !== "ascii") { animRaf = null; return; }
+        animRaf = requestAnimationFrame(tick);
+        if (fxLast && now - fxLast < FX_FRAME_MS) return;
+        const k = fxLast ? Math.min(250, now - fxLast) / 16.67 : 1;
+        fxLast = now;
+        if (anim) animPhase += 0.06 * k;
+        if (cyc) {
+          cycleHue = (cycleHue + 1.2 * k) % 360;
+          const hi = hslToRgb(cycleHue, 0.9, 0.62);
+          const sh = hslToRgb((cycleHue + 170) % 360, 0.75, 0.24);
+          els.highlightColor.value = rgbToHex(hi.r, hi.g, hi.b);
+          els.shadowColor.value = rgbToHex(sh.r, sh.g, sh.b);
+        }
+        renderCurrentMode();
+      };
+      animRaf = requestAnimationFrame(tick);
+    }
+    const startAnimLoop = startFxLoop;
+    const startCycleLoop = startFxLoop;
+
+    function appendHalftonePath(arr, x, y, r, step, shape, cosA, sinA, angleDeg) {
+      if (r <= 0.15) return;
+      if (shape === "circle") {
+        const rr = r.toFixed(1);
+        const d2 = (r * 2).toFixed(1);
+        arr.push(`M${(x - r).toFixed(1)},${y.toFixed(1)}a${rr},${rr} 0 1,0 ${d2},0a${rr},${rr} 0 1,0 -${d2},0`);
+        return;
+      }
+      if (shape === "ellipse") {
+        const rx = r * 1.25;
+        const ry = r * 0.72;
+        const dx = rx * cosA;
+        const dy = rx * sinA;
+        const rot = angleDeg.toFixed(1);
+        arr.push(`M${(x - dx).toFixed(1)},${(y - dy).toFixed(1)}a${rx.toFixed(1)},${ry.toFixed(1)} ${rot} 1,0 ${(dx * 2).toFixed(1)},${(dy * 2).toFixed(1)}a${rx.toFixed(1)},${ry.toFixed(1)} ${rot} 1,0 -${(dx * 2).toFixed(1)},-${(dy * 2).toFixed(1)}`);
+        return;
+      }
+      const pushRotRect = (hw, hh, c, s) => {
+        const x0 = x + (-hw * c - (-hh) * s), y0 = y + (-hw * s + (-hh) * c);
+        const x1 = x + (hw * c - (-hh) * s),  y1 = y + (hw * s + (-hh) * c);
+        const x2 = x + (hw * c - hh * s),     y2 = y + (hw * s + hh * c);
+        const x3 = x + (-hw * c - hh * s),    y3 = y + (-hw * s + hh * c);
+        arr.push(`M${x0.toFixed(1)},${y0.toFixed(1)}L${x1.toFixed(1)},${y1.toFixed(1)}L${x2.toFixed(1)},${y2.toFixed(1)}L${x3.toFixed(1)},${y3.toFixed(1)}Z`);
+      };
+      if (shape === "square") {
+        pushRotRect(r * 0.92, r * 0.92, cosA, sinA);
+      } else if (shape === "diamond") {
+        const radD = ((angleDeg + 45) * Math.PI) / 180;
+        pushRotRect(r * 0.88, r * 0.88, Math.cos(radD), Math.sin(radD));
+      } else if (shape === "line") {
+        pushRotRect(step * 0.58, r * 0.95, cosA, sinA);
+      } else {
+        // cross
+        const arm = r * 1.05;
+        const ht = Math.max(0.5, r * 0.28);
+        pushRotRect(arm, ht, cosA, sinA);
+        pushRotRect(ht, arm, cosA, sinA);
+      }
+    }
+
+    function renderHalftone() {
+      if (!currentImg) return;
+
+      const shape = els.htShape.value;
+      const gridType = els.htGrid.value;
+      const step = parseInt(els.htSize.value, 10);
+      const baseAngle = parseFloat(els.htAngle.value);
+      const maxScale = parseFloat(els.htMaxScale.value);
+      const minDot = parseFloat(els.htMinDot.value);
+      const softness = parseFloat(els.htSoftness.value);
+      const invert = els.htInvert.checked;
+      const colorMode = els.htColorMode.value;
+      const angleC = parseFloat(els.htAngleC.value);
+      const angleM = parseFloat(els.htAngleM.value);
+      const angleY = parseFloat(els.htAngleY.value);
+      const angleK = parseFloat(els.htAngleK.value);
+      const inkBlend = els.htInkBlend.value;
+      const contrast = parseFloat(els.htContrast.value);
+      const brightness = parseFloat(els.htBrightness.value);
+      const autoLevels = els.htAutoLevels.checked;
+      const misprint = parseFloat(els.htMisprint.value);
+      const paperGrain = parseFloat(els.htPaperGrain.value);
+      const vignetteAmt = parseFloat(els.htVignette.value);
+
+      // 更新顯示標籤
+      els.htSizeVal.textContent = `${step} px`;
+      els.htAngleVal.textContent = `${baseAngle.toFixed(1)}°`;
+      els.htMaxScaleVal.textContent = `${maxScale.toFixed(2)}×`;
+      els.htMinDotVal.textContent = minDot.toFixed(2);
+      els.htSoftnessVal.textContent = softness.toFixed(2);
+      els.htAngleCVal.textContent = `${angleC}°`;
+      els.htAngleMVal.textContent = `${angleM}°`;
+      els.htAngleYVal.textContent = `${angleY}°`;
+      els.htAngleKVal.textContent = `${angleK}°`;
+      els.htContrastVal.textContent = contrast.toFixed(2);
+      els.htBrightnessVal.textContent = brightness.toFixed(2);
+      els.htMisprintVal.textContent = `${misprint.toFixed(1)} px`;
+      els.htPaperGrainVal.textContent = paperGrain.toFixed(2);
+      els.htVignetteVal.textContent = vignetteAmt.toFixed(2);
+
+      // 切換色彩子面板顯示
+      els.htCmykWrap.style.display = colorMode === "cmyk" ? "flex" : "none";
+      els.htMonoWrap.style.display = colorMode === "mono" ? "block" : "none";
+      els.htDuoWrap.style.display = colorMode === "duotone" ? "flex" : "none";
+
+      // 取樣影像尺寸（拖動滑桿時採用 480px 快速預覽，放開後立即以 960px 完整向量重繪）
+      const crop = getSourceCropRect(currentImg);
+      const imgAspect = crop.sh / crop.sw;
+      const htSig = els.htSignal ? els.htSignal.value : "luma";
+      const fullW = 960;
+      // 高度直接依原圖比例計算（舊版 fullH 與 outH 下限不同，超寬圖會出現上下空帶）
+      const fullH = Math.max(60, Math.round(fullW * imgAspect));
+      svgWidth = fullW;
+      svgHeight = fullH;
+
+      const approxCols = Math.round(fullW / step);
+      const approxRows = Math.round(fullH / step);
+      els.gridBadge.textContent = `${approxCols} × ${approxRows} 網點 · ${step}px`;
+
+      const scaleFactor = isInteractiveDrag ? 0.5 : 1;
+      const outW = Math.round(fullW * scaleFactor);
+      const outH = Math.max(30, Math.round(fullH * scaleFactor));
+      // viewBox 單位（拖曳預覽為半尺寸）；放大鏡與比對分割線都以此換算
+      vbW = outW;
+      vbH = outH;
+      contentRect = { x: 0, y: 0, w: outW, h: outH };
+      const rStep = Math.max(3.5, step * scaleFactor);
+      const rMisprint = misprint * scaleFactor;
+      const rSoftness = softness;
+      const rPaperGrain = isInteractiveDrag ? 0 : paperGrain;
+
+      const pixels = getSourcePixels(crop, outW, outH);
+
+      // 背景設定（與全域背景與右下角去背模式同步）
+      const isTransparentBg = els.transparentBg && els.transparentBg.checked;
+      const bgRgb = getBgRgb(pixels);
+      const bgHex = rgbToHex(bgRgb.r, bgRgb.g, bgRgb.b);
+      if (els.canvasFrame) {
+        els.canvasFrame.classList.toggle("transparent-preview", isTransparentBg);
+      }
+      if (isTransparentBg) {
+        els.bgHexLabel.textContent = "透明 (去背 PNG)";
+        els.bgSwatch.style.background = "repeating-conic-gradient(#a8a8a8 0% 25%, #8f8f8f 0% 50%) 50% / 8px 8px";
+      } else {
+        els.bgHexLabel.textContent = bgHex;
+        els.bgSwatch.style.background = bgHex;
+      }
+
+      const modeNames = {
+        cmyk: "半色調：CMYK 四色網屏",
+        mono: "半色調：單色油墨網點",
+        rgb: "半色調：原圖全彩網點",
+        duotone: "半色調：雙色調網點"
+      };
+      els.stackBadge.textContent = modeNames[colorMode] || "半色調網點";
+      els.stackBadge.style.opacity = "1";
+
+      // 自動色階掃描
+      let autoMin = 1, autoMax = 0;
+      if (autoLevels) {
+        for (let i = 0; i < pixels.length; i += 16) {
+          if (pixels[i + 3] < ALPHA_CUTOFF) continue;
+          const lum = getSignalValue(pixels[i], pixels[i + 1], pixels[i + 2], htSig);
+          if (lum < autoMin) autoMin = lum;
+          if (lum > autoMax) autoMax = lum;
+        }
+      }
+      const autoRange = Math.max(autoMax - autoMin, 0.01);
+
+      applyDisplayMode();
+      asciiSvgDirty = true;
+      const svg = els.outputSvg;
+      svg.setAttribute("viewBox", `0 0 ${outW} ${outH}`);
+      svg.setAttribute("width", fullW);
+      svg.setAttribute("height", fullH);
+
+      const defs = [];
+      if (shape === "customSvg" && customSvgGlyph) {
+        defs.push(`<symbol id="htCustomGlyph" viewBox="${customSvgGlyph.viewBox}">${customSvgGlyph.inner}</symbol>`);
+      }
+      if (rPaperGrain > 0) {
+        const gOp = (rPaperGrain * 0.35).toFixed(2);
+        defs.push(`<pattern id="htGrainPat" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="3" cy="5" r="0.7" fill="#000" fill-opacity="${gOp}"/><circle cx="14" cy="3" r="0.6" fill="#fff" fill-opacity="${gOp}"/><circle cx="9" cy="14" r="0.8" fill="#000" fill-opacity="${gOp}"/><circle cx="20" cy="11" r="0.6" fill="#000" fill-opacity="${gOp}"/><circle cx="5" cy="21" r="0.6" fill="#fff" fill-opacity="${gOp}"/><circle cx="18" cy="20" r="0.7" fill="#000" fill-opacity="${gOp}"/><path d="M11 8l3 1M16 15l4-1M2 16l2 2" stroke="#000" stroke-width="0.4" stroke-opacity="${gOp}"/></pattern>`);
+      }
+      if (vignetteAmt > 0 && !isTransparentBg) {
+        defs.push(`<radialGradient id="htVigGrad" cx="50%" cy="50%" r="72%"><stop offset="35%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity="${(vignetteAmt * 0.85).toFixed(2)}"/></radialGradient>`);
+      }
+
+      const svgParts = [];
+      if (defs.length > 0) svgParts.push(`<defs>${defs.join("")}</defs>`);
+      svgParts.push(`<g id="svgSceneRoot">`);
+      if (!isTransparentBg) {
+        svgParts.push(`<rect x="0" y="0" width="${outW}" height="${outH}" fill="${bgHex}"/>`);
+      }
+
+      const cx = outW * 0.5;
+      const cy = outH * 0.5;
+      const isHex = gridType === "hex";
+      const rowStep = isHex ? rStep * 0.8660254 : rStep;
+      // 只走訪「旋轉網格中真正覆蓋畫布」的格點範圍（舊版以對角線正方形全掃，
+      // 約有 60% 迭代落在畫布外被丟棄）
+      const gridRange = (cosA, sinA) => {
+        const m = rStep * 1.5;
+        let gxMin = Infinity, gxMax = -Infinity, gyMin = Infinity, gyMax = -Infinity;
+        for (const [px, py] of [[-m, -m], [outW + m, -m], [-m, outH + m], [outW + m, outH + m]]) {
+          const dx = px - cx, dy = py - cy;
+          const gx = dx * cosA + dy * sinA;
+          const gy = -dx * sinA + dy * cosA;
+          if (gx < gxMin) gxMin = gx;
+          if (gx > gxMax) gxMax = gx;
+          if (gy < gyMin) gyMin = gy;
+          if (gy > gyMax) gyMax = gy;
+        }
+        return {
+          k0: Math.floor(gyMin / rowStep), k1: Math.ceil(gyMax / rowStep),
+          j0: Math.floor(gxMin / rStep) - 1, j1: Math.ceil(gxMax / rStep)
+        };
+      };
+
+      const sampleTone = (px, py) => {
+        const ix = Math.max(0, Math.min(outW - 1, Math.round(px)));
+        const iy = Math.max(0, Math.min(outH - 1, Math.round(py)));
+        const idx = (iy * outW + ix) * 4;
+        const r = pixels[idx], g = pixels[idx + 1], b = pixels[idx + 2], a = pixels[idx + 3];
+        let lum = getSignalValue(r, g, b, htSig);
+        if (autoLevels) lum = (lum - autoMin) / autoRange;
+        lum = clamp(((lum - 0.5) * contrast + 0.5) * brightness, 0, 1);
+        return { r, g, b, a, lum };
+      };
+
+      let totalInkArea = 0;
+      const calcShapeArea = (r) => {
+        if (shape === "circle") return Math.PI * r * r;
+        if (shape === "ellipse") return Math.PI * (r * 1.25) * (r * 0.72);
+        if (shape === "square") return (r * 1.84) * (r * 1.84);
+        if (shape === "diamond") return (r * 1.76) * (r * 1.76);
+        if (shape === "line") return (rStep * 1.16) * (r * 1.9);
+        if (shape === "cross") return r * r * 2.1;
+        return r * r * 2.4;
+      };
+      const pushCustomUse = (arr, px, py, r, angleDeg, col, op = 1) => {
+        if (r <= 0.25) return;
+        const d = r * 2;
+        const rot = angleDeg !== 0 ? ` transform="rotate(${angleDeg.toFixed(1)} ${px.toFixed(1)} ${py.toFixed(1)})"` : "";
+        const opAttr = op < 0.99 ? ` opacity="${op.toFixed(2)}"` : "";
+        arr.push(`<use href="#htCustomGlyph" x="${(px - r).toFixed(1)}" y="${(py - r).toFixed(1)}" width="${d.toFixed(1)}" height="${d.toFixed(1)}" color="${col}" fill="${col}"${opAttr}${rot}/>`);
+      };
+
+      if (colorMode === "cmyk") {
+        const plates = [
+          { ch: "c", angle: angleC + baseAngle - 45, color: "#00aeef", ox: 0.85, oy: -0.5 },
+          { ch: "m", angle: angleM + baseAngle - 45, color: "#ec008c", ox: -0.75, oy: 0.8 },
+          { ch: "y", angle: angleY + baseAngle - 45, color: "#fff200", ox: 0.45, oy: 0.75 },
+          { ch: "k", angle: angleK + baseAngle - 45, color: "#14161a", ox: -0.4, oy: -0.45 }
+        ];
+        const blendCss = inkBlend === "source-over" ? "normal" : inkBlend;
+        const useVectorSoft = rSoftness > 0.01;
+        svgParts.push(`<g>`);
+        for (const plate of plates) {
+          const rad = (plate.angle * Math.PI) / 180;
+          const cosA = Math.cos(rad);
+          const sinA = Math.sin(rad);
+          const shiftX = plate.ox * rMisprint;
+          const shiftY = plate.oy * rMisprint;
+          const dCore = [];
+          const dMid = useVectorSoft ? [] : null;
+          const dOuter = useVectorSoft ? [] : null;
+
+          const R = gridRange(cosA, sinA);
+          for (let k = R.k0; k <= R.k1; k++) {
+            const gy = k * rowStep;
+            const hexOffset = isHex && (k & 1) ? rStep * 0.5 : 0;
+            for (let j = R.j0; j <= R.j1; j++) {
+              const gx = j * rStep + hexOffset;
+              const x = cx + gx * cosA - gy * sinA;
+              const y = cy + gx * sinA + gy * cosA;
+              if (x < -rStep || x > outW + rStep || y < -rStep || y > outH + rStep) continue;
+
+              const s = sampleTone(x, y);
+              if (s.a < ALPHA_CUTOFF) continue; // 去背圖透明區不印網點
+              let rn = s.r / 255, gn = s.g / 255, bn = s.b / 255;
+              if (autoLevels) {
+                const stretch = (v) => clamp((v - autoMin) / autoRange, 0, 1);
+                rn = stretch(rn); gn = stretch(gn); bn = stretch(bn);
+              }
+              const adj = (v) => clamp(((v - 0.5) * contrast + 0.5) * brightness, 0, 1);
+              rn = adj(rn); gn = adj(gn); bn = adj(bn);
+
+              const k = 1 - Math.max(rn, gn, bn);
+              let val = 0;
+              if (plate.ch === "k") val = k;
+              else if (k < 1 - 1e-4) {
+                if (plate.ch === "c") val = (1 - rn - k) / (1 - k);
+                else if (plate.ch === "m") val = (1 - gn - k) / (1 - k);
+                else val = (1 - bn - k) / (1 - k);
+              }
+              if (htSig !== "luma") val = clamp(val * 0.45 + s.lum * 0.75, 0, 1);
+              if (invert) val = 1 - val;
+              if (val < minDot) continue;
+
+              const radius = (rStep * 0.5) * Math.sqrt(val) * maxScale;
+              totalInkArea += calcShapeArea(radius);
+              const px = x + shiftX;
+              const py = y + shiftY;
+              if (shape === "customSvg") {
+                if (useVectorSoft) {
+                  pushCustomUse(dOuter, px, py, radius * (1 + rSoftness * 0.42), plate.angle, plate.color, 0.20);
+                  pushCustomUse(dMid, px, py, radius * (1 + rSoftness * 0.18), plate.angle, plate.color, 0.42);
+                  pushCustomUse(dCore, px, py, radius * (1 - rSoftness * 0.06), plate.angle, plate.color, 1);
+                } else {
+                  pushCustomUse(dCore, px, py, radius, plate.angle, plate.color, 1);
+                }
+              } else if (useVectorSoft) {
+                appendHalftonePath(dOuter, px, py, radius * (1 + rSoftness * 0.42), rStep, shape, cosA, sinA, plate.angle);
+                appendHalftonePath(dMid, px, py, radius * (1 + rSoftness * 0.18), rStep, shape, cosA, sinA, plate.angle);
+                appendHalftonePath(dCore, px, py, radius * (1 - rSoftness * 0.06), rStep, shape, cosA, sinA, plate.angle);
+              } else {
+                appendHalftonePath(dCore, px, py, radius, rStep, shape, cosA, sinA, plate.angle);
+              }
+            }
+          }
+          if (dCore.length > 0) {
+            if (shape === "customSvg") {
+              const innerUses = useVectorSoft ? `${dOuter.join("")}${dMid.join("")}${dCore.join("")}` : dCore.join("");
+              svgParts.push(`<g style="mix-blend-mode: ${blendCss};">${innerUses}</g>`);
+            } else if (useVectorSoft) {
+              svgParts.push(`<g style="mix-blend-mode: ${blendCss};"><path d="${dOuter.join("")}" fill="${plate.color}" fill-opacity="0.20"/><path d="${dMid.join("")}" fill="${plate.color}" fill-opacity="0.42"/><path d="${dCore.join("")}" fill="${plate.color}"/></g>`);
+            } else {
+              svgParts.push(`<path d="${dCore.join("")}" fill="${plate.color}" style="mix-blend-mode: ${blendCss};"/>`);
+            }
+          }
+        }
+        svgParts.push(`</g>`);
+      } else {
+        const rad = (baseAngle * Math.PI) / 180;
+        const cosA = Math.cos(rad);
+        const sinA = Math.sin(rad);
+        const monoColor = els.htInkColor.value;
+        const duoHi = hexToRgb(els.htDuoHi.value);
+        const duoSh = hexToRgb(els.htDuoSh.value);
+        const colorBuckets = new Map();
+
+        const R = gridRange(cosA, sinA);
+        for (let k = R.k0; k <= R.k1; k++) {
+          const gy = k * rowStep;
+          const hexOffset = isHex && (k & 1) ? rStep * 0.5 : 0;
+          for (let j = R.j0; j <= R.j1; j++) {
+            const gx = j * rStep + hexOffset;
+            const x = cx + gx * cosA - gy * sinA;
+            const y = cy + gx * sinA + gy * cosA;
+            if (x < -rStep || x > outW + rStep || y < -rStep || y > outH + rStep) continue;
+
+            const s = sampleTone(x, y);
+            if (s.a < ALPHA_CUTOFF) continue;
+            const t = invert ? s.lum : (1 - s.lum);
+            if (t < minDot) continue;
+
+            const radius = (rStep * 0.5) * Math.sqrt(t) * maxScale;
+            totalInkArea += calcShapeArea(radius);
+            let dotColor = monoColor;
+            if (colorMode === "rgb") {
+              dotColor = quantHex(s.r, s.g, s.b, 17);
+            } else if (colorMode === "duotone") {
+              const mixed = lerpRgb(duoSh, duoHi, s.lum);
+              dotColor = quantHex(mixed.r, mixed.g, mixed.b, 17);
+            }
+
+            let jx = 0, jy = 0;
+            if (rMisprint > 0) {
+              const h1 = Math.sin(gx * 12.9898 + gy * 78.233) * 43758.5453;
+              const h2 = Math.sin(gx * 39.346 + gy * 11.135) * 24634.6345;
+              jx = ((h1 - Math.floor(h1)) - 0.5) * rMisprint * 1.4;
+              jy = ((h2 - Math.floor(h2)) - 0.5) * rMisprint * 1.4;
+            }
+            let bucket = colorBuckets.get(dotColor);
+            if (!bucket) {
+              bucket = rSoftness > 0.01 ? { core: [], mid: [], outer: [] } : { core: [] };
+              colorBuckets.set(dotColor, bucket);
+            }
+            const px = x + jx;
+            const py = y + jy;
+            if (shape === "customSvg") {
+              if (rSoftness > 0.01) {
+                pushCustomUse(bucket.outer, px, py, radius * (1 + rSoftness * 0.42), baseAngle, dotColor, 0.20);
+                pushCustomUse(bucket.mid, px, py, radius * (1 + rSoftness * 0.18), baseAngle, dotColor, 0.42);
+                pushCustomUse(bucket.core, px, py, radius * (1 - rSoftness * 0.06), baseAngle, dotColor, 1);
+              } else {
+                pushCustomUse(bucket.core, px, py, radius, baseAngle, dotColor, 1);
+              }
+            } else if (rSoftness > 0.01) {
+              appendHalftonePath(bucket.outer, px, py, radius * (1 + rSoftness * 0.42), rStep, shape, cosA, sinA, baseAngle);
+              appendHalftonePath(bucket.mid, px, py, radius * (1 + rSoftness * 0.18), rStep, shape, cosA, sinA, baseAngle);
+              appendHalftonePath(bucket.core, px, py, radius * (1 - rSoftness * 0.06), rStep, shape, cosA, sinA, baseAngle);
+            } else {
+              appendHalftonePath(bucket.core, px, py, radius, rStep, shape, cosA, sinA, baseAngle);
+            }
+          }
+        }
+        svgParts.push(`<g>`);
+        for (const [col, b] of colorBuckets) {
+          if (shape === "customSvg") {
+            svgParts.push(rSoftness > 0.01 ? `${b.outer.join("")}${b.mid.join("")}${b.core.join("")}` : b.core.join(""));
+          } else if (rSoftness > 0.01) {
+            svgParts.push(`<path d="${b.outer.join("")}" fill="${col}" fill-opacity="0.20"/><path d="${b.mid.join("")}" fill="${col}" fill-opacity="0.42"/><path d="${b.core.join("")}" fill="${col}"/>`);
+          } else {
+            svgParts.push(`<path d="${b.core.join("")}" fill="${col}"/>`);
+          }
+        }
+        svgParts.push(`</g>`);
+      }
+
+      if (rPaperGrain > 0 && !isTransparentBg) {
+        svgParts.push(`<rect x="0" y="0" width="${outW}" height="${outH}" fill="url(#htGrainPat)" pointer-events="none"/>`);
+      }
+
+      if (vignetteAmt > 0 && !isTransparentBg) {
+        svgParts.push(`<rect x="0" y="0" width="${outW}" height="${outH}" fill="url(#htVigGrad)" pointer-events="none"/>`);
+      }
+
+      svgParts.push(`</g>`);
+      svg.innerHTML = svgParts.join("");
+      svg.style.filter = "";
+      if (els.inkBadge) {
+        const inkPct = (totalInkArea / Math.max(1, outW * outH)) * 100;
+        els.inkBadge.textContent = colorMode === "cmyk"
+          ? `總墨量 ${Math.min(400, inkPct).toFixed(0)}%`
+          : `覆蓋率 ${Math.min(100, inkPct).toFixed(1)}%`;
+      }
+    }
+
+    const HT_PRESETS = {
+      cmyk: () => {
+        els.htColorMode.value = "cmyk";
+        els.htShape.value = "circle";
+        els.htGrid.value = "square";
+        els.htSize.value = 10;
+        els.htAngle.value = 45;
+        els.htAngleC.value = 15;
+        els.htAngleM.value = 75;
+        els.htAngleY.value = 0;
+        els.htAngleK.value = 45;
+        els.htInkBlend.value = "multiply";
+        els.htMaxScale.value = 1.05;
+        els.htMinDot.value = 0.03;
+        els.htSoftness.value = 0;
+        els.htInvert.checked = false;
+        els.htMisprint.value = 0;
+        els.htPaperGrain.value = 0;
+        els.bgMode.value = "light";
+        els.htBgSync.value = "light";
+        els.customBgWrap.style.display = "none";
+      },
+      newspaper: () => {
+        els.htColorMode.value = "mono";
+        els.htInkColor.value = "#1f2937";
+        els.htShape.value = "circle";
+        els.htGrid.value = "square";
+        els.htSize.value = 8;
+        els.htAngle.value = 45;
+        els.htMaxScale.value = 1.1;
+        els.htMinDot.value = 0.04;
+        els.htSoftness.value = 0;
+        els.htInvert.checked = false;
+        els.htMisprint.value = 0.5;
+        els.htPaperGrain.value = 0.18;
+        els.bgMode.value = "custom";
+        els.htBgSync.value = "custom";
+        els.customBgFormat.value = "rgb";
+        els.customBgInput.value = "238, 232, 218";
+        els.customBgWrap.style.display = "flex";
+      },
+      popart: () => {
+        els.htColorMode.value = "rgb";
+        els.htShape.value = "circle";
+        els.htGrid.value = "hex";
+        els.htSize.value = 16;
+        els.htAngle.value = 30;
+        els.htMaxScale.value = 1.15;
+        els.htMinDot.value = 0.05;
+        els.htSoftness.value = 0;
+        els.htInvert.checked = true;
+        els.htMisprint.value = 0;
+        els.htPaperGrain.value = 0;
+        els.bgMode.value = "dark";
+        els.htBgSync.value = "dark";
+        els.customBgWrap.style.display = "none";
+      },
+      screenprint: () => {
+        els.htColorMode.value = "mono";
+        els.htInkColor.value = "#f8fafc";
+        els.htShape.value = "circle";
+        els.htGrid.value = "square";
+        els.htSize.value = 11;
+        els.htAngle.value = 22.5;
+        els.htMaxScale.value = 1.0;
+        els.htMinDot.value = 0.08;
+        els.htSoftness.value = 0;
+        els.htInvert.checked = true;
+        els.htMisprint.value = 0;
+        els.htPaperGrain.value = 0;
+        els.bgMode.value = "navy";
+        els.htBgSync.value = "navy";
+        els.customBgWrap.style.display = "none";
+      },
+      risograph: () => {
+        els.htColorMode.value = "cmyk";
+        els.htShape.value = "ellipse";
+        els.htGrid.value = "hex";
+        els.htSize.value = 12;
+        els.htAngle.value = 45;
+        els.htInkBlend.value = "multiply";
+        els.htMaxScale.value = 1.1;
+        els.htMinDot.value = 0.04;
+        els.htSoftness.value = 0;
+        els.htInvert.checked = false;
+        els.htMisprint.value = 4.0;
+        els.htPaperGrain.value = 0.2;
+        els.bgMode.value = "light";
+        els.htBgSync.value = "light";
+        els.customBgWrap.style.display = "none";
+      },
+      linescreen: () => {
+        els.htColorMode.value = "mono";
+        els.htInkColor.value = "#111827";
+        els.htShape.value = "line";
+        els.htGrid.value = "square";
+        els.htSize.value = 9;
+        els.htAngle.value = 45;
+        els.htMaxScale.value = 1.05;
+        els.htMinDot.value = 0.02;
+        els.htSoftness.value = 0;
+        els.htInvert.checked = false;
+        els.htMisprint.value = 0;
+        els.htPaperGrain.value = 0.06;
+        els.bgMode.value = "light";
+        els.htBgSync.value = "light";
+        els.customBgWrap.style.display = "none";
+      }
+    };
+
+    // 快捷場景預設
+    const SCENES = {
+      stack3d: () => {
+        els.colorMode.value = "duotone";
+        els.duotonePreset.value = "amber";
+        els.duotoneHint.textContent = DUOTONE_PRESETS.amber.label;
+        els.highlightColor.value = "#ffd166";
+        els.shadowColor.value = "#2b2d7c";
+        els.bgMode.value = "dark";
+        els.rampPreset.value = "@%#*+=-:. ";
+        els.customRampWrap.style.display = "none";
+        els.stackMode.value = "extrude";
+        els.stackModeHint.textContent = STACK_HINTS.extrude;
+        els.stackLayers.value = 5;
+        els.stackDepth.value = 4.0;
+        els.stackAngle.value = 135;
+        els.stackFade.value = 0.6;
+        els.stackScale.checked = true;
+        els.bloom.value = 0.25;
+        els.scanlines.value = 0;
+        els.vignette.value = 0;
+        els.chromaticAberration.value = 0;
+        els.glitch.value = 0;
+      },
+      classic3d: () => {
+        els.colorMode.value = "duotone";
+        els.duotonePreset.value = "amber";
+        els.duotoneHint.textContent = DUOTONE_PRESETS.amber.label;
+        els.highlightColor.value = "#ffd166";
+        els.shadowColor.value = "#2b2d7c";
+        els.bgMode.value = "dark";
+        els.rampPreset.value = "@%#*+=-:. ";
+        els.customRampWrap.style.display = "none";
+        els.stackMode.value = "off";
+        els.stackModeHint.textContent = STACK_HINTS.off;
+        els.bloom.value = 0;
+        els.scanlines.value = 0;
+        els.vignette.value = 0;
+        els.chromaticAberration.value = 0;
+        els.glitch.value = 0;
+      },
+      cyber: () => {
+        els.colorMode.value = "duotone";
+        els.duotonePreset.value = "cyberpunk";
+        els.duotoneHint.textContent = DUOTONE_PRESETS.cyberpunk.label;
+        els.highlightColor.value = "#00F2FF";
+        els.shadowColor.value = "#7000FF";
+        els.bgMode.value = "navy";
+        els.rampPreset.value = "█▓▒░ ";
+        els.customRampWrap.style.display = "none";
+        els.stackMode.value = "parallax";
+        els.stackModeHint.textContent = STACK_HINTS.parallax;
+        els.stackLayers.value = 4;
+        els.stackDepth.value = 3.5;
+        els.bloom.value = 0.85;
+        els.scanlines.value = 0.35;
+        els.vignette.value = 0;
+        els.chromaticAberration.value = 1.5;
+        els.glitch.value = 0;
+      },
+      retroCrt: () => {
+        els.colorMode.value = "duotone";
+        els.duotonePreset.value = "forestCream";
+        els.duotoneHint.textContent = DUOTONE_PRESETS.forestCream.label;
+        els.highlightColor.value = "#4ade80";
+        els.shadowColor.value = "#064e3b";
+        els.bgMode.value = "dark";
+        els.rampPreset.value = "@%#*+=-:. ";
+        els.customRampWrap.style.display = "none";
+        els.stackMode.value = "overprint";
+        els.stackModeHint.textContent = STACK_HINTS.overprint;
+        els.stackDepth.value = 2.0;
+        els.bloom.value = 0.45;
+        els.scanlines.value = 0.55;
+        els.vignette.value = 0.45;
+        els.chromaticAberration.value = 0.5;
+        els.glitch.value = 0;
+      }
+    };
+
+    function markSelectedPreset(btn) {
+      const grid = btn.closest(".preset-grid");
+      if (grid) grid.querySelectorAll(".btn").forEach((s) => s.classList.remove("is-selected-preset"));
+      btn.classList.add("is-selected-preset");
+    }
+
+    document.querySelectorAll("[data-scene]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const fn = SCENES[btn.dataset.scene];
+        if (fn) {
+          fn();
+          syncDuotonePresetLabel();
+          modeBgState.ascii = els.bgMode.value;
+          if (els.htBgSync) els.htBgSync.value = els.bgMode.value;
+          els.customBgWrap.style.display = els.bgMode.value === "custom" ? "flex" : "none";
+          markSelectedPreset(btn);
+          updateAllRangeTracks();
+          renderCurrentMode();
+          showToast(`已套用「${btn.textContent}」`);
+        }
+      });
+    });
+
+    // 綁定所有控制項自動重繪
+    const autoBindIds = [
+      "rampPreset", "customRamp", "bgMode", "customBgInput", "transparentBg",
+      "autoInvertRamp", "manualInvert",
+      "layoutMode", "cols", "aspect", "colorMode", "highlightColor", "shadowColor",
+      "colorMix", "blendMode", "contrast", "brightness", "saturation", "hueShift",
+      "autoContrast", "colorInvert", "stackMode", "stackLayers", "stackDepth",
+      "stackAngle", "stackFade", "stackScale", "stroke", "emboss", "edge",
+      "bloom", "scanlines", "halftone", "vignette", "chromaticAberration",
+      "asciiSignal", "aspectCrop", "glitch", "dither", "posterize",
+      "htSignal", "htShape", "htGrid", "htSize", "htAngle", "htMaxScale", "htMinDot",
+      "htSoftness", "htInvert", "htColorMode", "htAngleC", "htAngleM",
+      "htAngleY", "htAngleK", "htInkBlend", "htInkColor", "htDuoHi", "htDuoSh",
+      "htContrast", "htBrightness", "htAutoLevels", "htMisprint", "htPaperGrain", "htVignette"
+    ];
+
+    autoBindIds.forEach((id) => {
+      const el = $(id);
+      if (!el) return;
+      // 只綁 input（select / checkbox / color / text 在現代瀏覽器都會觸發 input）；
+      // 舊版另綁 change → 立即同步重繪，造成每次切換都重繪兩次
+      el.addEventListener("input", scheduleRender);
+    });
+
+    // 半色調風格預設按鈕
+    document.querySelectorAll("[data-ht-preset]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const fn = HT_PRESETS[btn.dataset.htPreset];
+        if (fn) {
+          fn();
+          els.customSvgWrap.style.display = els.htShape.value === "customSvg" ? "flex" : "none";
+          modeBgState.halftone = els.bgMode.value;
+          markSelectedPreset(btn);
+          updateAllRangeTracks();
+          renderCurrentMode();
+          showToast(`已套用「${btn.textContent}」`);
+        }
+      });
+    });
+
+    // 自訂 SVG 圖元切換與匯入
+    els.htShape.addEventListener("change", () => {
+      const isCustomSvg = els.htShape.value === "customSvg";
+      els.customSvgWrap.style.display = isCustomSvg ? "flex" : "none";
+      if (isCustomSvg) {
+        updateCustomSvgPreview(parseCustomSvgSource(els.customSvgInput.value), "已啟用自訂 SVG 圖元");
+      }
+    });
+    if (els.customSvgUploadBtn && els.customSvgFile) {
+      els.customSvgUploadBtn.addEventListener("click", () => els.customSvgFile.click());
+      els.customSvgFile.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const raw = ev.target.result || "";
+          els.customSvgInput.value = raw;
+          if (updateCustomSvgPreview(parseCustomSvgSource(raw), `已載入：${file.name}`)) {
+            renderCurrentMode();
+            showToast(`已載入自訂 SVG：${file.name}`);
+          }
+        };
+        reader.readAsText(file);
+        e.target.value = "";
+      });
+    }
+    if (els.customSvgInput) {
+      els.customSvgInput.addEventListener("input", () => {
+        if (updateCustomSvgPreview(parseCustomSvgSource(els.customSvgInput.value), "已更新自訂 SVG 圖元")) {
+          if (els.htShape.value === "customSvg") scheduleRender();
+        }
+      });
+    }
+    updateCustomSvgPreview(customSvgGlyph, "目前圖元：內建四芒星向量路徑");
+
+    els.rampPreset.addEventListener("change", () => {
+      els.customRampWrap.style.display = els.rampPreset.value === "custom" ? "flex" : "none";
+    });
+
+    els.bgMode.addEventListener("change", () => {
+      modeBgState[appMode] = els.bgMode.value;
+      const isCustom = els.bgMode.value === "custom";
+      els.customBgWrap.style.display = isCustom ? "flex" : "none";
+      if (els.htBgSync) els.htBgSync.value = els.bgMode.value;
+      if (isCustom) {
+        updateCustomBgPreview(parseCustomBgColor());
+      }
+    });
+
+    if (els.htBgSync) {
+      els.htBgSync.addEventListener("change", () => {
+        els.bgMode.value = els.htBgSync.value;
+        modeBgState[appMode] = els.bgMode.value;
+        const isCustom = els.bgMode.value === "custom";
+        els.customBgWrap.style.display = isCustom ? "flex" : "none";
+        if (isCustom) {
+          updateCustomBgPreview(parseCustomBgColor());
+        }
+        renderCurrentMode();
+      });
+    }
+
+    els.customBgFormat.addEventListener("change", () => {
+      const fmt = els.customBgFormat.value;
+      const raw = els.customBgInput.value.trim();
+      // 嘗試將現有輸入轉換成新格式
+      if (fmt === "cmyk") {
+        els.customBgInput.placeholder = "例如：80, 40, 0, 20 或 80% 40% 0% 20%";
+        const hexMatch = raw.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+        const nums = raw.replace(/^rgb\s*\(|\)$/gi, "").split(/[\s,;/]+/).filter(Boolean).map(Number);
+        let r = 10, g = 13, b = 18;
+        if (hexMatch) {
+          let h = hexMatch[1];
+          if (h.length === 3) h = h.split("").map((ch) => ch + ch).join("");
+          const num = parseInt(h, 16);
+          r = (num >> 16) & 255; g = (num >> 8) & 255; b = num & 255;
+        } else if (nums.length >= 3 && nums.slice(0, 3).every((n) => Number.isFinite(n))) {
+          r = Math.max(0, Math.min(255, Math.round(nums[0])));
+          g = Math.max(0, Math.min(255, Math.round(nums[1])));
+          b = Math.max(0, Math.min(255, Math.round(nums[2])));
+        }
+        const cmyk = rgbToCmyk(r, g, b);
+        els.customBgInput.value = `${cmyk.c}, ${cmyk.m}, ${cmyk.y}, ${cmyk.k}`;
+      } else {
+        els.customBgInput.placeholder = "例如：20, 30, 45 或 #141e2d";
+        const cmykNums = raw.replace(/^cmyk\s*\(|\)$/gi, "").replace(/%/g, "").split(/[\s,;/]+/).filter(Boolean).map(Number);
+        if (cmykNums.length >= 4 && cmykNums.slice(0, 4).every((n) => Number.isFinite(n))) {
+          const clamp100 = (v) => Math.max(0, Math.min(100, v));
+          const c = clamp100(cmykNums[0]) / 100;
+          const m = clamp100(cmykNums[1]) / 100;
+          const y = clamp100(cmykNums[2]) / 100;
+          const k = clamp100(cmykNums[3]) / 100;
+          const r = Math.round(255 * (1 - c) * (1 - k));
+          const g = Math.round(255 * (1 - m) * (1 - k));
+          const b = Math.round(255 * (1 - y) * (1 - k));
+          els.customBgInput.value = `${r}, ${g}, ${b}`;
+        } else {
+          els.customBgInput.value = "10, 13, 18";
+        }
+      }
+      renderCurrentMode();
+    });
+
+    // 預設色下拉選單與實際顏色同步：顏色不屬於任何預設時顯示「自訂顏色」
+    function syncDuotonePresetLabel() {
+      const hi = els.highlightColor.value.toLowerCase();
+      const sh = els.shadowColor.value.toLowerCase();
+      const hit = Object.entries(DUOTONE_PRESETS).find(([, p]) => p.highlight.toLowerCase() === hi && p.shadow.toLowerCase() === sh);
+      els.duotonePreset.value = hit ? hit[0] : "";
+      els.duotoneHint.textContent = hit ? hit[1].label : "自訂亮部（前進凸出）與暗部（後退下沉）的色彩插值端點。";
+    }
+    els.highlightColor.addEventListener("input", syncDuotonePresetLabel);
+    els.shadowColor.addEventListener("input", syncDuotonePresetLabel);
+
+    els.duotonePreset.addEventListener("change", (e) => {
+      const p = DUOTONE_PRESETS[e.target.value];
+      if (!p) return;
+      els.highlightColor.value = p.highlight;
+      els.shadowColor.value = p.shadow;
+      els.duotoneHint.textContent = p.label;
+      renderCurrentMode();
+    });
+
+    els.stackMode.addEventListener("change", () => {
+      els.stackModeHint.textContent = STACK_HINTS[els.stackMode.value] || "";
+    });
+
+    els.animate.addEventListener("change", () => {
+      if (els.animate.checked) startAnimLoop();
+    });
+
+    els.duotoneCycle.addEventListener("change", () => {
+      if (els.duotoneCycle.checked) startCycleLoop();
+    });
+
+    // 檔案上傳 & 拖放（ASCII 與半色調共用）
+    function loadImageFile(file) {
+      if (!file || !file.type.startsWith("image/")) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          setCurrentImage(img);
+          renderCurrentMode();
+          showToast("已載入新圖片");
+        };
+        img.onerror = () => showToast("圖片解碼失敗，請確認檔案格式");
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function bindDropzone(zone) {
+      if (!zone) return;
+      zone.addEventListener("click", () => els.fileInput.click());
+      zone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        zone.classList.add("dragover");
+      });
+      zone.addEventListener("dragleave", () => zone.classList.remove("dragover"));
+      zone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        zone.classList.remove("dragover");
+        loadImageFile(e.dataTransfer.files[0]);
+      });
+    }
+
+    bindDropzone(els.dropzone);
+    bindDropzone(els.htDropzone);
+    els.fileInput.addEventListener("change", (e) => {
+      loadImageFile(e.target.files[0]);
+      e.target.value = ""; // 允許再次選取同一個檔案
+    });
+
+    els.demoBtn.addEventListener("click", () => { createDemoSpheres(); showToast("已載入光影雙球示範"); });
+    els.demoTorusBtn.addEventListener("click", () => { createDemoTorus(); showToast("已載入立體環面示範"); });
+    if (els.htDemoBtn) {
+      els.htDemoBtn.addEventListener("click", () => { createDemoSpheres(); showToast("已載入光影雙球示範"); });
+    }
+    if (els.htDemoTorusBtn) {
+      els.htDemoTorusBtn.addEventListener("click", () => { createDemoTorus(); showToast("已載入立體環面示範"); });
+    }
+
+    // 畫布適應視窗 / 100% 切換
+    els.fitBtn.addEventListener("click", () => {
+      els.outputSvg.classList.toggle("fit-mode");
+      applyAsciiCanvasSizing();
+      cachedSvgRect = null;
+    });
+
+    // 複製純文字 ASCII
+    els.copyTextBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(lastAsciiText);
+        showToast("已複製純文字 ASCII 到剪貼簿");
+      } catch {
+        showToast("瀏覽器不支援剪貼簿存取");
+      }
+    });
+
+    // 匯出 SVG 向量檔
+    els.exportSvgBtn.addEventListener("click", () => {
+      ensureOutputSvg();
+      const serializer = new XMLSerializer();
+      const svgStr = '<?xml version="1.0" encoding="UTF-8"?>\n' + serializer.serializeToString(els.outputSvg);
+      const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const isTransparent = els.transparentBg && els.transparentBg.checked;
+      const prefix = appMode === "halftone" ? "rasterlab-halftone" : "rasterlab-ascii";
+      link.download = isTransparent ? `${prefix}-transparent.svg` : `${prefix}.svg`;
+      link.href = url;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast(isTransparent ? "已匯出去背 SVG 向量檔" : "已匯出 SVG 向量檔");
+    });
+
+    // ===== 匯出 PNG：可選解析度（以長邊計，最高 8K 7680px），保留透明通道 =====
+    const EXPORT_MAX_EDGE = 7680;
+    function getExportScale() {
+      const v = els.exportRes ? els.exportRes.value : "2x";
+      const longEdge = Math.max(svgWidth, svgHeight) || 1;
+      let scale = v === "1x" ? 1 : v === "2x" ? 2 : parseInt(v, 10) / longEdge;
+      if (!Number.isFinite(scale) || scale <= 0) scale = 2;
+      // 任何選項都不超過 8K 長邊
+      scale = Math.min(scale, EXPORT_MAX_EDGE / longEdge);
+      return scale;
+    }
+
+    // 下拉選單即時顯示實際輸出尺寸
+    function updateExportResLabels() {
+      if (!els.exportRes) return;
+      const names = { "1x": "1× 原尺寸", "2x": "2× 高解析", "1920": "Full HD", "2560": "2K QHD", "3840": "4K UHD", "5120": "5K", "7680": "8K UHD" };
+      const keep = els.exportRes.value;
+      const longEdge = Math.max(svgWidth, svgHeight) || 1;
+      for (const opt of els.exportRes.options) {
+        const v = opt.value;
+        let sc = v === "1x" ? 1 : v === "2x" ? 2 : parseInt(v, 10) / longEdge;
+        sc = Math.min(sc, EXPORT_MAX_EDGE / longEdge);
+        opt.textContent = `PNG：${names[v] || v} · ${Math.round(svgWidth * sc)} × ${Math.round(svgHeight * sc)}`;
+      }
+      els.exportRes.value = keep;
+    }
+
+    function downloadCanvasPng(canvas, filename, okMsg) {
+      // 大圖用 toBlob，避免 8K 的 base64 data URL 吃光記憶體
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          showToast("PNG 匯出失敗：解析度超出此瀏覽器的畫布上限，請改用較低解析度");
+          return;
+        }
+        const fallback = () => {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.download = filename;
+          link.href = url;
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
+          showToast(okMsg);
+        };
+        // 觸控裝置：優先叫出系統分享選單（iOS 可直接「儲存影像」到照片；Android 可存到相簿或傳送）
+        if (IS_COARSE && navigator.canShare) {
+          try {
+            const file = new File([blob], filename, { type: "image/png" });
+            if (navigator.canShare({ files: [file] })) {
+              navigator.share({ files: [file], title: filename })
+                .then(() => showToast(okMsg))
+                .catch((err) => { if (!err || err.name !== "AbortError") fallback(); });
+              return;
+            }
+          } catch (e) {}
+        }
+        fallback();
+      }, "image/png");
+    }
+
+    els.exportBtn.addEventListener("click", () => {
+      const isTransparent = els.transparentBg && els.transparentBg.checked;
+      const prefix = appMode === "halftone" ? "rasterlab-halftone" : "rasterlab-ascii";
+      const scale = getExportScale();
+      const outW = Math.max(1, Math.round(svgWidth * scale));
+      const outH = Math.max(1, Math.round(svgHeight * scale));
+      const filename = `${prefix}-${outW}x${outH}${isTransparent ? "-transparent" : ""}.png`;
+      const okMsg = `已匯出 ${outW}×${outH} ${isTransparent ? "去背透明 " : ""}PNG`;
+      showToast(`正在輸出 ${outW}×${outH} PNG…`);
+
+      // 讓提示先畫出來，再進行可能耗時的大圖繪製
+      setTimeout(() => {
+        if (appMode === "ascii" && asciiScene) {
+          // ASCII：直接以目標解析度重繪場景（向量級清晰，不是放大點陣）
+          const c = document.createElement("canvas");
+          c.width = outW;
+          c.height = outH;
+          const cCtx = c.getContext("2d");
+          if (!cCtx) { showToast("PNG 匯出失敗：無法建立畫布"); return; }
+          cCtx.setTransform(outW / asciiScene.w, 0, 0, outH / asciiScene.h, 0, 0);
+          drawAsciiScene(cCtx, asciiScene);
+          // 釋放 Bloom 暫存畫布（8K 時約 200MB）
+          if (bloomScratch && bloomScratch.width * bloomScratch.height > 4096 * 4096) {
+            bloomScratch.width = 0;
+            bloomScratch.height = 0;
+          }
+          downloadCanvasPng(c, filename, okMsg);
+          return;
+        }
+
+        // 半色調：把 SVG 的固有尺寸設為目標解析度再點陣化，網點保持向量銳利
+        const clone = els.outputSvg.cloneNode(true);
+        clone.setAttribute("width", outW);
+        clone.setAttribute("height", outH);
+        clone.style.display = "block";
+        const svgStr = new XMLSerializer().serializeToString(clone);
+        const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          const c = document.createElement("canvas");
+          c.width = outW;
+          c.height = outH;
+          const cCtx = c.getContext("2d");
+          cCtx.drawImage(img, 0, 0, outW, outH);
+          URL.revokeObjectURL(url);
+          downloadCanvasPng(c, filename, okMsg);
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          showToast("PNG 匯出失敗（SVG 無法轉為點陣圖）");
+        };
+        img.src = url;
+      }, 30);
+    });
+
+    // 重設預設值
+    els.resetBtn.addEventListener("click", () => {
+      els.transparentBg.checked = false;
+      els.aspectCrop.value = "source";
+      els.asciiSignal.value = "luma";
+      els.htSignal.value = "luma";
+      els.customSvgWrap.style.display = "none";
+      els.customBgWrap.style.display = "none";
+      els.customBgFormat.value = "rgb";
+      els.customBgInput.value = "10, 13, 18";
+
+      if (appMode === "halftone") {
+        HT_PRESETS.cmyk();
+        modeBgState.halftone = "light";
+        els.htContrast.value = 1.15;
+        els.htBrightness.value = 1.0;
+        els.htAutoLevels.checked = true;
+        els.htVignette.value = 0;
+        document.querySelectorAll(".is-selected-preset").forEach((b) => b.classList.remove("is-selected-preset"));
+        updateAllRangeTracks();
+        renderCurrentMode();
+        showToast("已重設半色調為預設參數");
+        return;
+      }
+
+      els.animate.checked = false;
+      els.duotoneCycle.checked = false;
+      els.bgMode.value = "dark";
+      els.htBgSync.value = "dark";
+      modeBgState.ascii = "dark";
+      els.layoutMode.value = "grid";
+      els.cols.value = 220;
+      els.aspect.value = 0.55;
+      els.contrast.value = 1.25;
+      els.brightness.value = 1.0;
+      els.saturation.value = 1.0;
+      els.hueShift.value = 0;
+      els.colorMix.value = 0.85;
+      els.blendMode.value = "normal";
+      els.autoContrast.checked = false;
+      els.colorInvert.checked = false;
+      els.autoInvertRamp.checked = true;
+      els.manualInvert.checked = false;
+      els.stroke.value = 0;
+      els.emboss.value = 0;
+      els.edge.value = 0;
+      els.halftone.value = 0;
+      els.vignette.value = 0;
+      els.glitch.value = 0;
+      els.dither.value = 0;
+      els.posterize.value = 0;
+      SCENES.stack3d();
+      els.bloom.value = 0;
+      els.stackLayers.value = 4;
+      els.stackDepth.value = 3.0;
+      els.stackFade.value = 0.55;
+      els.stackAngle.value = 135;
+      syncDuotonePresetLabel();
+      document.querySelectorAll(".is-selected-preset").forEach((b) => b.classList.remove("is-selected-preset"));
+      updateAllRangeTracks();
+      renderCurrentMode();
+      showToast("已重設為預設參數");
+    });
+
+    // 原圖比對開關與拖曳分割線
+    els.compareToggle.addEventListener("change", () => {
+      syncCompareCanvas();
+    });
+
+    let isDraggingSplit = false;
+    const updateSplitFromClientX = (clientX) => {
+      const rect = els.canvasStageWrap.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const pct = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+      compareSplitPct = pct;
+      els.canvasStageWrap.style.setProperty("--split", `${pct}%`);
+      updateMagnifierSplit();
+    };
+
+    const startSplitDrag = (e) => {
+      if (!els.compareToggle.checked) return;
+      e.preventDefault();
+      isDraggingSplit = true;
+      document.body.classList.add("is-dragging-split");
+      const sel = window.getSelection && window.getSelection();
+      if (sel && sel.removeAllRanges) sel.removeAllRanges();
+      updateSplitFromClientX(e.clientX);
+    };
+
+    const stopSplitDrag = () => {
+      if (!isDraggingSplit) return;
+      isDraggingSplit = false;
+      document.body.classList.remove("is-dragging-split");
+    };
+
+    els.compareDivider.addEventListener("pointerdown", startSplitDrag);
+    els.compareDivider.addEventListener("mousedown", (e) => e.preventDefault());
+    els.compareDivider.addEventListener("dragstart", (e) => e.preventDefault());
+
+    els.canvasStageWrap.addEventListener("pointerdown", (e) => {
+      if (!els.compareToggle.checked) return;
+      startSplitDrag(e);
+    });
+    els.canvasStageWrap.addEventListener("mousedown", (e) => {
+      if (els.compareToggle.checked) e.preventDefault();
+    });
+
+    window.addEventListener("pointermove", (e) => {
+      if (!isDraggingSplit) return;
+      e.preventDefault();
+      updateSplitFromClientX(e.clientX);
+    });
+    window.addEventListener("pointerup", stopSplitDrag);
+    window.addEventListener("pointercancel", stopSplitDrag);
+    window.addEventListener("blur", stopSplitDrag);
+    document.addEventListener("selectstart", (e) => {
+      if (isDraggingSplit) e.preventDefault();
+    });
+
+    // 放大鏡細節檢視（純向量 SVG viewBox 縮放，使用 rAF 與 transform 避免游標卡頓）
+    let magRaf = null;
+    let magLastEvent = null;
+    let cachedSvgRect = null;
+
+    const updateMagnifierState = () => {
+      const on = els.magnifierToggle.checked;
+      els.magnifierZoom.style.display = on ? "inline-block" : "none";
+      els.canvasStageWrap.style.cursor = on ? "crosshair" : "default";
+      els.canvasStageWrap.style.touchAction = "none";
+      if (on) {
+        cachedSvgRect = displayEl().getBoundingClientRect();
+        if (els.compareToggle.checked) {
+          syncCompareCanvas();
+        } else {
+          syncMagnifierSvg();
+        }
+      } else {
+        els.magnifierLens.hidden = true;
+        els.magnifierSvg.innerHTML = "";
+      }
+    };
+
+    els.magnifierToggle.addEventListener("change", updateMagnifierState);
+    els.magnifierZoom.addEventListener("change", () => {
+      els.magnifierBadge.textContent = `${els.magnifierZoom.value}×`;
+    });
+
+    const flushMagnifierMove = () => {
+      magRaf = null;
+      const e = magLastEvent;
+      if (!e || !els.magnifierToggle.checked || isDraggingSplit) {
+        els.magnifierLens.hidden = true;
+        return;
+      }
+      const rect = cachedSvgRect || (cachedSvgRect = displayEl().getBoundingClientRect());
+      if (!rect || rect.width <= 0 || rect.height <= 0) return;
+
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      if (mx < 0 || my < 0 || mx > rect.width || my > rect.height) {
+        els.magnifierLens.hidden = true;
+        return;
+      }
+
+      const zoom = parseFloat(els.magnifierZoom.value) || 3;
+      const lensSize = 176;
+      els.magnifierLens.hidden = false;
+      // 觸控時鏡頭放在手指上方，避免被手指遮住；貼近頂端時改放下方
+      let lensY = e.clientY - lensSize * 0.5;
+      if (e.touch) { lensY = e.clientY - lensSize - 36; if (lensY < 4) lensY = e.clientY + 36; }
+      els.magnifierLens.style.transform = `translate3d(${(e.clientX - lensSize * 0.5).toFixed(1)}px, ${lensY.toFixed(1)}px, 0)`;
+      els.magnifierBadge.textContent = `${zoom}×`;
+
+      const scaleX = vbW / rect.width;
+      const scaleY = vbH / rect.height;
+      const cx = mx * scaleX;
+      const cy = my * scaleY;
+      const sampleW = (lensSize * scaleX) / zoom;
+      const sampleH = (lensSize * scaleY) / zoom;
+      const sx = cx - sampleW * 0.5;
+      const sy = cy - sampleH * 0.5;
+
+      if (appMode === "ascii") {
+        drawAsciiLens(sx, sy, sampleW, sampleH);
+        return;
+      }
+      els.magnifierSvg.setAttribute("viewBox", `${sx.toFixed(2)} ${sy.toFixed(2)} ${sampleW.toFixed(2)} ${sampleH.toFixed(2)}`);
+      const splitLine = els.magnifierSvg.querySelector("#magSplitLine");
+      if (splitLine) splitLine.setAttribute("stroke-width", ((sampleW / lensSize) * 2).toFixed(2));
+    };
+
+    els.canvasStageWrap.addEventListener("pointerenter", () => {
+      if (els.magnifierToggle.checked) {
+        cachedSvgRect = displayEl().getBoundingClientRect();
+      }
+    });
+    els.canvasStageWrap.addEventListener("pointermove", (e) => {
+      if (!els.magnifierToggle.checked || isDraggingSplit || (e.isPrimary === false)) {
+        if (!els.magnifierLens.hidden) els.magnifierLens.hidden = true;
+        return;
+      }
+      if (pinchActive()) return;
+      magLastEvent = { clientX: e.clientX, clientY: e.clientY, touch: e.pointerType !== "mouse" };
+      if (!magRaf) {
+        magRaf = requestAnimationFrame(flushMagnifierMove);
+      }
+    });
+    window.addEventListener("resize", () => { cachedSvgRect = null; });
+    els.canvasStageWrap.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse" || !els.magnifierToggle.checked || els.compareToggle.checked || pinchActive()) return;
+      cachedSvgRect = null;
+      magLastEvent = { clientX: e.clientX, clientY: e.clientY, touch: true };
+      if (!magRaf) magRaf = requestAnimationFrame(flushMagnifierMove);
+    });
+    els.canvasStageWrap.addEventListener("pointerup", (e) => {
+      if (e.pointerType === "mouse") return;
+      magLastEvent = null;
+      els.magnifierLens.hidden = true;
+    });
+    els.canvasStageWrap.addEventListener("pointerleave", () => {
+      magLastEvent = null;
+      els.magnifierLens.hidden = true;
+    });
+    els.canvasStageWrap.addEventListener("pointercancel", () => {
+      magLastEvent = null;
+      els.magnifierLens.hidden = true;
+    });
+
+    // ===== 硬體滑桿與按鍵回饋感強化 =====
+    function updateRangeTrack(rangeEl) {
+      const min = parseFloat(rangeEl.min) || 0;
+      const max = parseFloat(rangeEl.max) || 100;
+      const val = parseFloat(rangeEl.value) || 0;
+      const pct = max > min ? ((val - min) / (max - min)) * 100 : 0;
+      rangeEl.style.backgroundImage = `linear-gradient(to right, #ff4d00 0%, #ff4d00 ${pct.toFixed(1)}%, #c6c2b6 ${pct.toFixed(1)}%, #c6c2b6 100%)`;
+    }
+
+    function updateAllRangeTracks() {
+      document.querySelectorAll('input[type="range"]').forEach(updateRangeTrack);
+    }
+
+    const endActiveSlide = () => {
+      if (!isInteractiveDrag) return;
+      if (activeSlideEl) {
+        const ctl = activeSlideEl.closest(".ctl");
+        if (ctl) ctl.classList.remove("is-sliding");
+      }
+      if (renderRaf) {
+        cancelAnimationFrame(renderRaf);
+        renderRaf = null;
+      }
+      isInteractiveDrag = false;
+      activeSlideEl = null;
+      renderCurrentMode();
+    };
+
+    document.querySelectorAll('input[type="range"]').forEach((r) => {
+      const ctl = r.closest(".ctl");
+      r.addEventListener("pointerdown", () => {
+        isInteractiveDrag = true;
+        activeSlideEl = r;
+        if (ctl) ctl.classList.add("is-sliding");
+        if (navigator.vibrate) navigator.vibrate(4);
+      });
+      r.addEventListener("input", () => updateRangeTrack(r));
+      r.addEventListener("change", () => {
+        updateRangeTrack(r);
+        if (isInteractiveDrag) endActiveSlide();
+      });
+    });
+
+    window.addEventListener("pointerup", endActiveSlide);
+    window.addEventListener("pointercancel", endActiveSlide);
+    window.addEventListener("blur", endActiveSlide);
+
+    // 按鍵按下回饋
+    document.querySelectorAll(".btn, .mode-btn, .tab-btn").forEach((b) => {
+      b.addEventListener("pointerdown", () => {
+        b.classList.add("is-pressed");
+        if (navigator.vibrate) navigator.vibrate(5);
+      });
+      const release = () => b.classList.remove("is-pressed");
+      b.addEventListener("pointerup", release);
+      b.addEventListener("pointerleave", release);
+      b.addEventListener("pointercancel", release);
+    });
+
+    // 啟動
+    syncDuotonePresetLabel();
+    updateAllRangeTracks();
+    createDemoSpheres();
+
+    /* ================= v1.3 觸控手勢與行動版面 =================
+       畫布（觸控筆／手指；滑鼠維持原本行為）：
+         雙指捏合：縮放 1–8×（以兩指中點為中心）並可同時平移，任何模式下都可用（會暫停分割線拖曳與放大鏡）
+         雙擊：放大 2.5× ／ 已放大時還原（比對原圖與放大鏡都關閉時）
+         放大後單指拖曳：平移（比對原圖與放大鏡都關閉時）
+       放大鏡（觸控）：按住即出現，鏡頭浮在手指上方；放開即消失。
+       手機直立：畫布在上、控制項在下；拖曳中間把手調整上下比例，雙擊把手切換大／小畫布。 */
+    const IS_COARSE = window.matchMedia("(pointer: coarse)").matches;
+    const MOBILE_MQ = window.matchMedia("(max-width: 960px)");
+    const view = { z: 1, tx: 0, ty: 0 };
+    const tptrs = new Map();
+    let tGesture = null, tLastTap = { t: 0, x: 0, y: 0 };
+    function pinchActive() { return !!(tGesture && tGesture.kind === "pinch"); }
+    function applyView() {
+      const wrap = els.canvasStageWrap;
+      wrap.style.transform = view.z === 1 && !view.tx && !view.ty ? "" : `translate(${view.tx.toFixed(1)}px, ${view.ty.toFixed(1)}px) scale(${view.z.toFixed(4)})`;
+      cachedSvgRect = null;
+    }
+    function clampView() {
+      view.z = Math.min(8, Math.max(1, view.z));
+      const wrap = els.canvasStageWrap;
+      const mx = wrap.offsetWidth * (view.z - 1) / 2, my = wrap.offsetHeight * (view.z - 1) / 2;
+      view.tx = Math.min(mx, Math.max(-mx, view.tx));
+      view.ty = Math.min(my, Math.max(-my, view.ty));
+      if (view.z <= 1.001) { view.z = 1; view.tx = 0; view.ty = 0; }
+    }
+    function zoomAt(fx, fy, z2) {
+      const r = els.canvasStageWrap.getBoundingClientRect(), cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+      const qx = (fx - cx) / view.z, qy = (fy - cy) / view.z;
+      z2 = Math.min(8, Math.max(1, z2));
+      view.tx += (view.z - z2) * qx; view.ty += (view.z - z2) * qy; view.z = z2;
+      clampView(); applyView();
+    }
+    function resetView() { if (view.z !== 1 || view.tx || view.ty) { view.z = 1; view.tx = 0; view.ty = 0; applyView(); } }
+    const tPinch = () => { const [a, b] = [...tptrs.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; };
+    const freeCanvas = () => !els.compareToggle.checked && !els.magnifierToggle.checked;
+
+    // 在畫框（父層）以捕獲階段攔截，確保比原有的分割線／放大鏡處理器先執行
+    els.canvasFrame.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse") return;
+      tptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now() });
+      if (tptrs.size === 2) {
+        // 第二指落下：轉為捏合，取消分割線拖曳與放大鏡
+        if (typeof stopSplitDrag === "function") stopSplitDrag();
+        magLastEvent = null; els.magnifierLens.hidden = true;
+        const pi = tPinch(); tGesture = { kind: "pinch", d0: pi.d, z0: view.z, mx: pi.x, my: pi.y };
+        e.stopPropagation();
+        return;
+      }
+      if (tptrs.size > 2) { e.stopPropagation(); return; }
+      tGesture = { kind: "one", moved: false };
+    }, true);
+    els.canvasFrame.addEventListener("pointermove", (e) => {
+      const p = tptrs.get(e.pointerId); if (!p) return;
+      const px = p.x, py = p.y; p.x = e.clientX; p.y = e.clientY;
+      if (!tGesture) return;
+      if (tGesture.kind === "pinch" && tptrs.size >= 2) {
+        e.stopPropagation();
+        const pi = tPinch();
+        zoomAt(pi.x, pi.y, tGesture.z0 * pi.d / tGesture.d0);
+        view.tx += pi.x - tGesture.mx; view.ty += pi.y - tGesture.my; tGesture.mx = pi.x; tGesture.my = pi.y;
+        clampView(); applyView();
+        return;
+      }
+      if (!tGesture.moved && Math.hypot(p.x - p.x0, p.y - p.y0) > 10) tGesture.moved = true;
+      if (tGesture.moved && view.z > 1 && freeCanvas()) {
+        view.tx += p.x - px; view.ty += p.y - py; clampView(); applyView();
+      }
+    }, true);
+    const tEnd = (e) => {
+      const p = tptrs.get(e.pointerId); if (!p) return;
+      tptrs.delete(e.pointerId);
+      if (tGesture && tGesture.kind === "pinch") {
+        e.stopPropagation();
+        if (tptrs.size === 1) { const [q] = tptrs.values(); q.x0 = q.x; q.y0 = q.y; tGesture = { kind: "one", moved: true }; }
+        else if (!tptrs.size) tGesture = null;
+        return;
+      }
+      const tap = tGesture && !tGesture.moved && e.type === "pointerup" && performance.now() - p.t0 < 300;
+      tGesture = null;
+      if (!tap || !freeCanvas()) return;
+      const now = performance.now();
+      if (now - tLastTap.t < 300 && Math.hypot(e.clientX - tLastTap.x, e.clientY - tLastTap.y) < 32) {
+        tLastTap.t = 0;
+        if (view.z > 1.001) resetView(); else zoomAt(e.clientX, e.clientY, 2.5);
+      } else tLastTap = { t: now, x: e.clientX, y: e.clientY };
+    };
+    ["pointerup", "pointercancel"].forEach((ev) => els.canvasFrame.addEventListener(ev, tEnd, true));
+
+    // 畫面幾何改變時檢視回到 100%
+    {
+      const _setCurrentImage = setCurrentImage;
+      setCurrentImage = (img) => { _setCurrentImage(img); resetView(); };
+    }
+    els.aspectCrop.addEventListener("change", resetView);
+    els.fitBtn.addEventListener("click", () => { resetView(); applyAsciiCanvasSizing(); });
+    document.querySelectorAll(".mode-btn").forEach((b) => b.addEventListener("click", resetView));
+
+    // 畫布區尺寸改變（旋轉、上下比例調整、瀏覽器列收合）→ 重新計算適應視窗尺寸
+    if (window.ResizeObserver) {
+      let roRaf = 0;
+      new ResizeObserver(() => {
+        cancelAnimationFrame(roRaf);
+        roRaf = requestAnimationFrame(() => { applyAsciiCanvasSizing(); clampView(); applyView(); });
+      }).observe(document.querySelector(".stage"));
+    }
+
+    // 手機：「去背模式輸出」併入左下浮動列（原本固定在右下角，會蓋住下方控制面板）
+    {
+      const outOpt = document.querySelector(".floating-output-opt");
+      const home = outOpt.parentNode, homeNext = outOpt.nextSibling, bar = document.querySelector(".floating-left-bar");
+      const place = () => { if (MOBILE_MQ.matches) bar.appendChild(outOpt); else if (outOpt.parentNode !== home) home.insertBefore(outOpt, homeNext); };
+      place();
+      (MOBILE_MQ.addEventListener ? MOBILE_MQ.addEventListener("change", place) : MOBILE_MQ.addListener(place));
+    }
+
+    // 手機：上下分割把手（拖曳調整畫布高度，雙擊切換 40% / 70%）
+    {
+      const handle = document.createElement("div");
+      handle.className = "sheet-handle";
+      handle.setAttribute("role", "separator");
+      handle.setAttribute("aria-label", "拖曳調整畫布與控制面板比例");
+      const aside = document.querySelector("aside");
+      aside.insertBefore(handle, aside.firstChild);
+      let startY = 0, startH = 0, dragging = false, lastT = 0;
+      const vh = () => window.innerHeight || document.documentElement.clientHeight;
+      const setH = (h) => {
+        const v = Math.min(0.78, Math.max(0.28, h / vh()));
+        document.body.style.setProperty("--stage-h", `${(v * 100).toFixed(1)}dvh`);
+      };
+      handle.addEventListener("pointerdown", (e) => {
+        dragging = true; startY = e.clientY; startH = document.querySelector("main").getBoundingClientRect().height;
+        handle.setPointerCapture(e.pointerId);
+        const now = performance.now();
+        if (now - lastT < 300) { setH(startH / vh() > 0.55 ? vh() * 0.4 : vh() * 0.7); dragging = false; }
+        lastT = now;
+      });
+      handle.addEventListener("pointermove", (e) => { if (dragging) setH(startH + (e.clientY - startY)); });
+      ["pointerup", "pointercancel"].forEach((ev) => handle.addEventListener(ev, () => { dragging = false; }));
+    }
+
+    // 手機：去背開關標籤縮短，讓浮動列維持單行
+    {
+      const lab = document.querySelector(".floating-output-opt span");
+      const full = lab.textContent;
+      const sync = () => { lab.textContent = MOBILE_MQ.matches ? "去背 PNG" : full; };
+      sync();
+      (MOBILE_MQ.addEventListener ? MOBILE_MQ.addEventListener("change", sync) : MOBILE_MQ.addListener(sync));
+    }
+
+    // 觸控裝置：上傳區文字改為點擊／拍照
+    if (IS_COARSE) {
+      [els.dropzone, els.htDropzone].forEach((z) => {
+        if (z) z.innerHTML = '點擊選擇圖片或拍照<br /><span style="font-size: 0.7rem; color: var(--muted);">支援 PNG / JPG / WebP（含去背 PNG）</span>';
+      });
+    }
+    applyAsciiCanvasSizing();
+  </script>
+</body>
+</html>
